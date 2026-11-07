@@ -1,38 +1,95 @@
 import streamlit as st
 
-# ویب سائٹ کا ٹائٹل اور سیٹنگ
-st.set_page_config(page_title="School Student AI Chatbot", page_icon="📚", layout="centered")
+# صفحہ کی سیٹنگ
+st.set_page_config(
+    page_title="School Educational Chatbot",
+    page_icon="🤖",
+    layout="centered"
+)
 
-st.title("📚 School Student Helper Chatbot (Classes 1 to 10)")
-st.write("ہیلو! میں آپ کا اسکول کا اسسٹنٹ ہوں۔ آپ مجھ سے اردو، انگلش، سائنس (فزکس، کیمسٹری)، اسلامیات یا کسی بھی مضمون کے بارے میں پوچھ سکتے ہیں، یا ہوم ورک، خطوط (Khutoot) اور مضامین میں مدد لے سکتے ہیں!")
+# سٹائلنگ اور ڈیزائن
+st.markdown(
+    """
+    <style>
+    .main-title {
+        text-align: center;
+        color: #2b580c;
+        font-size: 32px;
+        font-weight: bold;
+    }
+    .sub-title {
+        text-align: center;
+        color: #555555;
+        font-size: 16px;
+        margin-bottom: 30px;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
-# چیٹ کی ہسٹری کو محفوظ رکھنے کے لیے
+st.markdown(
+    '<p class="main-title">📚 School AI Educational Chatbot</p>',
+    unsafe_allow_html=True,
+)
+st.markdown(
+    '<p class="sub-title">Classes 1 to 10 | Urdu, English, Science, & Islamiat</p>',
+    unsafe_allow_html=True,
+)
+
+# سائیڈ بار میں طالب علم کی معلومات
+st.sidebar.header("🎓 Student Settings")
+student_class = st.sidebar.selectbox(
+    "Select Your Class:",
+    [
+        "Class 1",
+        "Class 2",
+        "Class 3",
+        "Class 4",
+        "Class 5",
+        "Class 6",
+        "Class 7",
+        "Class 8",
+        "Class 9",
+        "Class 10",
+    ],
+)
+selected_subject = st.sidebar.selectbox(
+    "Select Subject:", ["General / All Subjects", "Urdu", "Science", "Islamiat", "English"]
+)
+
+# چیট ہسٹری کو محفوظ کرنا
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# پرانی چیٹس کو سکرین پر دکھانا
+# پرانی چٹس کو سکرین پر دکھانا
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# یوزر کا ان پٹ لینے کے لیے باکس
-user_input = st.chat_input("یہاں اپنا سوال پوچھیں (مثلاً: سائنس کا کوئی سوال، انگلش لیٹر، یا اردو کا خط)...")
+# یوزر کا ان پٹ لینا
+user_prompt = st.chat_input(
+    "Ask your question here (اردو یا English میں سوال پوچھیں)..."
+)
 
-if user_input:
-    # یوزر کا پیغام دکھانا
-    st.session_state.messages.append({"role": "user", "content": user_input})
+if user_prompt:
+    # یوزر کا پیغام شامل کریں
+    st.session_state.messages.append({"role": "user", "content": user_prompt})
     with st.chat_message("user"):
-        st.markdown(user_input)
+        st.markdown(user_prompt)
 
-    # باٹ کا جواب (یہاں آپ بعد میں AI کی API جوڑ سکتے ہیں، فی الحال یہ آپ کی رہنمائی کے لیے تیار ہے)
-    if "urdu" in user_input.lower() or "خات" in user_input.lower() or "خط" in user_input.lower():
-        bot_response = "آپ نے اردو یا خط کے بارے میں پوچھا ہے۔ (یہاں باٹ آپ کے مطلوبہ خط یا مضمون کی مکمل تفصیل اردو میں فراہم کرے گا)۔"
-    elif "physics" in user_input.lower() or "chemistry" in user_input.lower() or "science" in user_input.lower():
-        bot_response = "یہ سائنس (فزکس/کیمسٹری) سے متعلق سوال ہے۔ (یہاں اس کا سائنسی جواب اور آسان وضاحت دی جائے گی)۔"
-    else:
-        bot_response = f"موصول ہوا! آپ نے پوچھا ہے: '{user_input}'۔ میں کلاس 1 سے 10 تک کے نصاب کے مطابق اس کی مکمل وضاحت اور مدد فراہم کر رہا ہوں۔"
-
-    # باٹ کا جواب دکھانا
+    # بوٹ کا جواب تیار کرنا (یہاں آپ اپنی ضرورت کے مطابق اے آئی ماڈل یا منطق جوڑ سکتے ہیں)
     with st.chat_message("assistant"):
+        if (
+            "urdu" in selected_subject.lower()
+            or "اردو" in user_prompt
+            or any("\u0600" <= c <= "\u06FF" for c in user_prompt)
+        ):
+            bot_response = f"وعلیکم السلام! آپ نے **{student_class}** کے مضمون **{selected_subject}** کے حوالے سے پوچھا ہے۔ آپ کے اس سوال کا بہترین اور آسان جواب یہ ہے کہ: \n\n (یہاں آپ کا تعلیمی جواب ظاہر ہوگا، آپ اس کوڈ کو کسی بھی AI API سے لنک کر سکتے ہیں)۔"
+        else:
+            bot_response = f"Hello! I am your AI tutor for **{student_class}** in **{selected_subject}**. I'd be happy to help you with your homework and concepts. Here is the explanation for your query: '{user_prompt}'."
+
         st.markdown(bot_response)
-    st.session_state.messages.append({"role": "assistant", "content": bot_response})
+        st.session_state.messages.append(
+            {"role": "assistant", "content": bot_response}
+        )
