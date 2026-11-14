@@ -1,478 +1,108 @@
-```python
-import streamlit as st
-from openai import OpenAI
-import re
 
-# ============================================================
-# SCHOOL AI EDUCATIONAL CHATBOT
-# Classes 1–10 | Urdu + English | Major School Subjects
-# ============================================================
+Student question:
+{question}
 
-# ------------------------------------------------------------
-# PAGE CONFIGURATION
-# ------------------------------------------------------------
-st.set_page_config(
-    page_title="School AI Educational Chatbot",
-    page_icon="🎓",
-    layout="wide"
-)
+Teaching rules:
+- Use age-appropriate language and explain difficult words simply.
+- Stay suitable for a school student in {grade}.
+- Teach the method, not just the final answer.
+- For maths, show clear steps and check the result.
+- For science, explain the idea and give a familiar example.
+- For language subjects, explain grammar, vocabulary or writing clearly.
+- For Islamiyat and Pakistan Studies, be respectful and distinguish facts from opinions.
+- If the request is a quiz, create 5 questions and put answers in a separate answer key.
+- Never pretend to know the student's textbook page or syllabus if it was not provided.
+- If the question is unclear, ask one short clarifying question.
+- Do not invent facts. If unsure, say so.
+- Be encouraging, concise and helpful.
+"""
 
-# ------------------------------------------------------------
-# CUSTOM DESIGN
-# ------------------------------------------------------------
-st.markdown("""
-<style>
-    .main-title {
-        text-align: center;
-        font-size: 42px;
-        font-weight: 800;
-        margin-bottom: 5px;
-    }
-
-    .subtitle {
-        text-align: center;
-        font-size: 18px;
-        color: gray;
-        margin-bottom: 30px;
-    }
-
-    .footer {
-        text-align: center;
-        color: gray;
-        padding: 20px;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-
-# ------------------------------------------------------------
-# HEADER
-# ------------------------------------------------------------
-st.markdown(
-    "<div class='main-title'>🎓 School AI Educational Chatbot</div>",
-    unsafe_allow_html=True
-)
-
-st.markdown(
-    """
-    <div class='subtitle'>
-    Your Smart Learning Assistant 🤖📚<br>
-    Classes 1 to 10 | Urdu & English | Major School Subjects
-    </div>
-    """,
-    unsafe_allow_html=True
-)
-
-
-# ============================================================
-# API SETUP
-# ============================================================
-
-try:
-    client = OpenAI(
-        api_key=st.secrets["OPENAI_API_KEY"]
+def offline_answer(question: str) -> str:
+    """Basic sample help when no AI key has been configured."""
+    q = question.lower()
+    if any(greeting in q for greeting in ["hello", "hi", "salam", "assalam"]):
+        return "Hello! 👋 Welcome to Muhammad Abdullah School AI. Ask me a question from any school subject."
+    if "photosynthesis" in q:
+        return (
+            "**Photosynthesis** is how green plants make their food. Plants use sunlight, "
+            "water and carbon dioxide. This process mainly happens in leaves, and oxygen is released."
+        )
+    if "fraction" in q:
+        return (
+            "A **fraction** shows part of a whole. In 1/2, the top number (1) is the numerator "
+            "and the bottom number (2) is the denominator. It means one of two equal parts."
+        )
+    if "noun" in q:
+        return "A **noun** names a person, place, animal or thing. Examples: teacher, school, cat and book."
+    if "verb" in q:
+        return "A **verb** tells an action or state. Examples: read, write, run, is and are."
+    return (
+        "The AI answer service is not connected yet, so I can't give a reliable full answer to this question. "
+        "The app is ready for AI once you add a Gemini API key in Streamlit Secrets. "
+        "You can still try: photosynthesis, fraction, noun or verb."
     )
-except Exception:
-    client = None
-
-
-# ============================================================
-# SIDEBAR SETTINGS
-# ============================================================
-
-with st.sidebar:
-
-    st.title("⚙️ Student Settings")
-
-    student_class = st.selectbox(
-        "🎓 Select Your Class",
-        [f"Class {i}" for i in range(1, 11)]
-    )
-
-    subjects = [
-        "General / All Subjects",
-        "English",
-        "Urdu",
-        "Mathematics",
-        "General Science",
-        "Physics",
-        "Chemistry",
-        "Biology",
-        "Computer Science",
-        "Information Technology",
-        "Islamiat",
-        "Pakistan Studies",
-        "Social Studies",
-        "General Knowledge"
-    ]
-
-    selected_subject = st.selectbox(
-        "📚 Select Subject",
-        subjects
-    )
-
-    st.divider()
-
-    st.subheader("🤖 Chatbot Features")
-
-    st.write("✅ Classes 1–10")
-    st.write("✅ Urdu & English")
-    st.write("✅ Major School Subjects")
-    st.write("✅ Homework Help")
-    st.write("✅ Step-by-Step Learning")
-    st.write("✅ AI Powered Answers")
-
-    st.divider()
-
-    if st.button("🗑️ Clear Chat"):
-        st.session_state.messages = []
-        st.rerun()
-
-
-# ============================================================
-# CHAT HISTORY
-# ============================================================
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
+# Show conversation history
+for item in st.session_state.messages:
+    with st.chat_message(item["role"]):
+        st.markdown(item["content"])
 
-# ============================================================
-# RESPECTFUL LANGUAGE HANDLING
-# ============================================================
+question = st.chat_input("Ask a school question…")
 
-def is_inappropriate(text):
-
-    # اپنی school policy کے مطابق مزید keywords شامل کیے جا سکتے ہیں
-    blocked_patterns = [
-        r"\b(abuseword1)\b",
-        r"\b(abuseword2)\b"
-    ]
-
-    text_lower = text.lower()
-
-    for pattern in blocked_patterns:
-        if re.search(pattern, text_lower):
-            return True
-
-    return False
-
-
-# ============================================================
-# BASIC URDU + ENGLISH CONVERSATION
-# ============================================================
-
-def basic_chat_response(user_message):
-
-    message = user_message.lower().strip()
-
-    # ENGLISH GREETINGS
-    if message in ["hello", "hi", "hey", "hello chatbot"]:
-        return (
-            "Hello! 😊 How are you? "
-            "I am your School AI Educational Assistant. "
-            "How can I help you today?"
-        )
-
-    # URDU GREETINGS
-    elif "السلام علیکم" in user_message:
-        return (
-            "وعلیکم السلام! 😊 "
-            "آپ کیسے ہیں؟ میں آپ کی پڑھائی میں کیسے مدد کر سکتا ہوں؟"
-        )
-
-    # HOW ARE YOU
-    elif "how are you" in message:
-        return (
-            "I am doing great! 😊 "
-            "Thank you for asking. How can I help you with your studies?"
-        )
-
-    elif "کیسے ہو" in user_message or "کیا حال ہے" in user_message:
-        return (
-            "میں بالکل ٹھیک ہوں 😊 "
-            "آپ سنائیں! میں آپ کی پڑھائی میں کیسے مدد کر سکتا ہوں؟"
-        )
-
-    # NAME
-    elif "your name" in message:
-        return (
-            "My name is School AI Educational Chatbot 🤖📚 "
-            "I am here to help students learn and understand their subjects."
-        )
-
-    elif "آپ کا نام" in user_message or "تمہارا نام" in user_message:
-        return (
-            "میرا نام School AI Educational Chatbot ہے 🤖📚 "
-            "میں آپ کی تعلیم اور پڑھائی میں مدد کے لیے موجود ہوں۔"
-        )
-
-    # HELP
-    elif "help" == message or "can you help me" in message:
-        return (
-            "Of course! 😊 I can help you with school subjects, "
-            "homework, concepts, mathematics, science, English and more."
-        )
-
-    elif "مدد" == user_message.strip():
-        return (
-            "ضرور! 😊 میں آپ کی پڑھائی، ہوم ورک "
-            "اور مختلف مضامین کے سوالات میں مدد کر سکتا ہوں۔"
-        )
-
-    # THANK YOU
-    elif "thank you" in message or "thanks" in message:
-        return (
-            "You're welcome! 😊 "
-            "I am always happy to help you learn."
-        )
-
-    elif "شکریہ" in user_message:
-        return (
-            "آپ کا بہت شکریہ! 😊 "
-            "مجھے خوشی ہے کہ میں آپ کی مدد کر سکا۔"
-        )
-
-    # GOODBYE
-    elif message in ["bye", "goodbye"]:
-        return (
-            "Goodbye! 😊 Keep learning and have a great day! 📚✨"
-        )
-
-    elif "اللہ حافظ" in user_message:
-        return (
-            "اللہ حافظ! 😊 "
-            "اپنی پڑھائی جاری رکھیں اور ہمیشہ کامیاب رہیں۔ 📚✨"
-        )
-
-    return None
-
-
-# ============================================================
-# AI SYSTEM PROMPT
-# ============================================================
-
-def get_system_prompt(student_class, subject):
-
-    return f"""
-You are a professional School AI Educational Assistant.
-
-Student Class: {student_class}
-Selected Subject: {subject}
-
-Your purpose is to help school students learn safely and clearly.
-
-IMPORTANT RULES:
-
-1. Explain according to the student's class level.
-2. Use simple and easy language.
-3. If the student writes in Urdu, reply mainly in Urdu.
-4. If the student writes in English, reply mainly in English.
-5. Help with homework and educational concepts.
-6. For Mathematics, explain the solution step by step.
-7. For Science subjects, explain concepts clearly.
-8. For English, help with grammar, writing and comprehension.
-9. For Urdu, help with grammar, writing and explanations.
-10. For Computer Science and IT, explain concepts clearly and provide safe code examples.
-11. Be respectful, friendly and encouraging.
-12. Never insult or shame the student.
-13. If you are unsure about a fact, say so clearly.
-14. Do not invent facts or sources.
-15. Encourage students to understand concepts instead of only copying answers.
-16. Keep answers suitable for school students.
-
-Supported educational areas include:
-
-- English
-- Urdu
-- Mathematics
-- General Science
-- Physics
-- Chemistry
-- Biology
-- Computer Science
-- Information Technology
-- Islamiat
-- Pakistan Studies
-- Social Studies
-- General Knowledge
-
-Always try to give clear, useful and educational answers.
-"""
-
-
-# ============================================================
-# DISPLAY PREVIOUS CHAT
-# ============================================================
-
-for message in st.session_state.messages:
-
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
-
-
-# ============================================================
-# USER INPUT
-# ============================================================
-
-user_prompt = st.chat_input(
-    "Ask your question in Urdu or English..."
-)
-
-
-# ============================================================
-# PROCESS USER MESSAGE
-# ============================================================
-
-if user_prompt:
-
-    # Save user message
-    st.session_state.messages.append({
-        "role": "user",
-        "content": user_prompt
-    })
-
-    # Display user message
+if question:
+    st.session_state.messages.append({"role": "user", "content": question})
     with st.chat_message("user"):
-        st.markdown(user_prompt)
-
-
-    # --------------------------------------------------------
-    # ASSISTANT RESPONSE
-    # --------------------------------------------------------
+        st.markdown(question)
 
     with st.chat_message("assistant"):
+        with st.spinner("Preparing your study explanation…"):
+            api_key = get_api_key()
+            if api_key:
+                try:
+                    from google import genai
 
-        # Check respectful language
-        if is_inappropriate(user_prompt):
-
-            bot_response = """
-⚠️ **Please use respectful language.**
-
-This chatbot is designed to help students with:
-
-📚 Education  
-📝 Homework  
-🔬 School Subjects  
-🧠 Learning Concepts  
-
-Please ask your question politely. 😊
-"""
-
-            st.markdown(bot_response)
-
-
-        else:
-
-            # Check basic conversation first
-            basic_response = basic_chat_response(user_prompt)
-
-            if basic_response:
-
-                bot_response = basic_response
-                st.markdown(bot_response)
-
-
-            # ------------------------------------------------
-            # AI RESPONSE
-            # ------------------------------------------------
-
+                    client = genai.Client(api_key=api_key)
+                    result = client.models.generate_content(
+                        model="gemini-2.5-flash",
+                        contents=build_prompt(question),
+                    )
+                    answer = result.text or "Sorry, I couldn't prepare an answer. Please try again."
+                except Exception:
+                    answer = (
+                        "I couldn't connect to the AI service. Please check your Gemini API key "
+                        "in Streamlit Secrets and try again."
+                    )
             else:
+                answer = offline_answer(question)
 
-                if client is None:
+            st.markdown(answer)
+            st.session_state.messages.append({"role": "assistant", "content": answer})
 
-                    bot_response = """
-⚠️ **AI API Key Not Connected**
+if st.session_state.messages:
+    if st.button("🗑️ Clear conversation"):
+        st.session_state.messages = []
+        st.rerun()
 
-The chatbot design is working, but the AI brain needs an API key.
+with st.expander("⚙️ Setup: enable full AI answers"):
+    st.markdown(
+        """
+1. Add the packages from `requirements.txt`.
+2. Create a Gemini API key using Google AI Studio.
+3. In Streamlit Community Cloud, open your app's **Settings → Secrets**.
+4. Add this secret (replace the example text with your own key):
 
-Please add your API key in:
+```toml
+GEMINI_API_KEY = "YOUR_PRIVATE_API_KEY"
+```
 
-`.streamlit/secrets.toml`
-"""
-
-                    st.markdown(bot_response)
-
-                else:
-
-                    try:
-
-                        messages = [
-                            {
-                                "role": "system",
-                                "content": get_system_prompt(
-                                    student_class,
-                                    selected_subject
-                                )
-                            }
-                        ]
-
-                        # Add previous conversation
-                        for message in st.session_state.messages:
-
-                            messages.append({
-                                "role": message["role"],
-                                "content": message["content"]
-                            })
-
-
-                        with st.spinner("🤖 Thinking..."):
-
-                            response = client.chat.completions.create(
-                                model="gpt-4.1-mini",
-                                messages=messages
-                            )
-
-
-                        bot_response = (
-                            response.choices[0]
-                            .message.content
-                        )
-
-                        st.markdown(bot_response)
-
-
-                    except Exception:
-
-                        bot_response = """
-⚠️ **Connection Error**
-
-The chatbot could not connect to the AI service.
-
-Please check:
-
-1. Your API Key
-2. Internet Connection
-3. Streamlit Secrets Configuration
-4. OpenAI Account/API Access
-"""
-
-                        st.markdown(bot_response)
-
-
-        # ----------------------------------------------------
-        # SAVE ASSISTANT MESSAGE
-        # ----------------------------------------------------
-
-        st.session_state.messages.append({
-            "role": "assistant",
-            "content": bot_response
-        })
-
-
-# ============================================================
-# FOOTER
-# ============================================================
-
-st.divider()
+**Security:** Never paste your API key into this Python file or commit it to a public GitHub repository.
+        """
+    )
 
 st.markdown(
-    """
-    <div class='footer'>
-    🎓 School AI Educational Chatbot<br>
-    Smart Learning Assistant for Classes 1–10 🤖📚
-    </div>
-    """,
-    unsafe_allow_html=True
+    '<p class="small-note">Educational support only. Check important homework answers against your textbook and teacher’s instructions.</p>',
+    unsafe_allow_html=True,
 )
-```
