@@ -3,14 +3,18 @@ import streamlit as st
 import json
 import hashlib
 import hmac
+import secrets
 import os
 import re
+import ast
+import operator
 from pathlib import Path
+from datetime import datetime
 
-# =====================================================
-# MUHAMMAD ABDULLAH SCHOOL AI
-# COMPLETE OFFLINE CHATBOT + SIGN UP + SIGN IN
-# =====================================================
+# =========================================================
+# MUHAMMAD ABDULLAH SCHOOL AI - PROFESSIONAL EDITION
+# OFFLINE | NO API | NO GEMINI | NO API KEY
+# =========================================================
 
 st.set_page_config(
     page_title="Muhammad Abdullah | School AI",
@@ -19,8 +23,8 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-APP_DIR = Path(__file__).parent
-DB_FILE = APP_DIR / "users.json"
+BASE_DIR = Path(__file__).parent
+DB_FILE = BASE_DIR / "users.json"
 
 SUBJECTS = [
     "All Subjects", "Mathematics", "English", "Urdu",
@@ -29,94 +33,138 @@ SUBJECTS = [
     "Social Studies", "History", "Geography"
 ]
 
-LANGUAGES = ["Simple English", "Urdu", "Roman Urdu"]
-
-STUDY_MODES = [
-    "Explain a topic",
-    "Solve homework step by step",
-    "Make short revision notes",
-    "Create a practice quiz",
-    "Give examples",
-    "Explain difficult words",
-    "Check my understanding"
+LANGUAGES = [
+    "Simple English",
+    "Urdu",
+    "Roman Urdu"
 ]
 
-# =====================================================
-# DATABASE
-# =====================================================
+STUDY_MODES = [
+    "Normal Chat",
+    "Explain a Topic",
+    "Solve Homework",
+    "Make Revision Notes",
+    "Create Practice Quiz",
+    "Give Examples"
+]
 
-def load_users():
-    if DB_FILE.exists():
-        try:
-            return json.loads(DB_FILE.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            return {}
-    return {}
-
-
-def save_users(users):
-    temp_file = DB_FILE.with_suffix(".tmp")
-    temp_file.write_text(
-        json.dumps(users, indent=4),
-        encoding="utf-8"
-    )
-    os.replace(temp_file, DB_FILE)
-
-
-def hash_password(password, salt):
-    return hashlib.pbkdf2_hmac(
-        "sha256",
-        password.encode("utf-8"),
-        bytes.fromhex(salt),
-        200000
-    ).hex()
-
-
-def create_password_hash(password):
-    import secrets
-    salt = secrets.token_bytes(16)
-    return {
-        "salt": salt.hex(),
-        "hash": hash_password(password, salt.hex())
-    }
-
-
-def verify_password(password, stored):
-    try:
-        calculated = hash_password(password, stored["salt"])
-        return hmac.compare_digest(calculated, stored["hash"])
-    except (KeyError, TypeError):
-        return False
-
-
-# =====================================================
+# =========================================================
 # SESSION STATE
-# =====================================================
+# =========================================================
 
-defaults = {
+DEFAULTS = {
     "logged_in": False,
+    "page": "signin",
     "messages": [],
-    "auth_page": "Sign In"
+    "user_email": None,
+    "user_name": None,
+    "grade": None,
+    "new_chat_count": 0
 }
 
-for key, value in defaults.items():
+for key, value in DEFAULTS.items():
     if key not in st.session_state:
         st.session_state[key] = value
 
 
-# =====================================================
-# PROFESSIONAL DESIGN
-# =====================================================
+# =========================================================
+# DATABASE
+# =========================================================
+
+def load_users():
+    if not DB_FILE.exists():
+        return {}
+
+    try:
+        return json.loads(DB_FILE.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def save_users(users):
+    temp = DB_FILE.with_suffix(".tmp")
+
+    temp.write_text(
+        json.dumps(users, indent=4),
+        encoding="utf-8"
+    )
+
+    os.replace(temp, DB_FILE)
+
+
+def make_password(password):
+    salt = secrets.token_bytes(16)
+
+    hashed = hashlib.pbkdf2_hmac(
+        "sha256",
+        password.encode("utf-8"),
+        salt,
+        300000
+    )
+
+    return {
+        "salt": salt.hex(),
+        "hash": hashed.hex()
+    }
+
+
+def check_password(password, stored):
+    try:
+        salt = bytes.fromhex(stored["salt"])
+
+        hashed = hashlib.pbkdf2_hmac(
+            "sha256",
+            password.encode("utf-8"),
+            salt,
+            300000
+        )
+
+        return hmac.compare_digest(
+            hashed.hex(),
+            stored["hash"]
+        )
+
+    except (KeyError, TypeError, ValueError):
+        return False
+
+
+# =========================================================
+# LOGIN FUNCTIONS
+# =========================================================
+
+def login_user(email, user):
+    st.session_state.logged_in = True
+    st.session_state.user_email = email
+    st.session_state.user_name = user["name"]
+    st.session_state.grade = user["grade"]
+    st.session_state.messages = []
+    st.session_state.page = "chat"
+    st.rerun()
+
+
+def logout_user():
+    for key in [
+        "logged_in",
+        "user_email",
+        "user_name",
+        "grade",
+        "messages"
+    ]:
+        if key in st.session_state:
+            del st.session_state[key]
+
+    st.session_state.logged_in = False
+    st.session_state.page = "signin"
+    st.session_state.messages = []
+    st.rerun()
+
+
+# =========================================================
+# PROFESSIONAL CSS
+# =========================================================
 
 st.markdown("""
 <style>
-
-:root {
-    --navy:#07182B;
-    --blue:#123B63;
-    --teal:#176B9A;
-    --ice:#DCEBFA;
-}
 
 .stApp {
     background:
@@ -126,7 +174,7 @@ st.markdown("""
 }
 
 [data-testid="stHeader"] {
-    background:rgba(6,20,38,.72);
+    background:rgba(6,20,38,.75);
 }
 
 [data-testid="stSidebar"] {
@@ -137,18 +185,22 @@ st.markdown("""
     color:#F4F8FC !important;
 }
 
+[data-testid="stSidebar"] input,
+[data-testid="stSidebar"] [data-baseweb="select"] {
+    color:#102A43 !important;
+}
+
 .hero {
-    padding:28px 30px;
+    padding:30px;
     border-radius:22px;
-    color:white;
     background:linear-gradient(115deg,#07182B,#123B63 58%,#176B9A);
-    border:1px solid rgba(142,190,230,.22);
+    border:1px solid rgba(142,190,230,.3);
     box-shadow:0 14px 34px rgba(0,0,0,.28);
-    margin-bottom:18px;
+    margin-bottom:20px;
 }
 
 .hero h1 {
-    color:white !important;
+    color:#FFFFFF !important;
     font-size:2.1rem;
 }
 
@@ -159,15 +211,15 @@ st.markdown("""
 .mini-card {
     background:linear-gradient(145deg,#102B49,#15395E);
     border:1px solid #28527A;
-    border-radius:16px;
-    padding:17px;
-    min-height:95px;
+    border-radius:17px;
+    padding:18px;
+    min-height:105px;
     box-shadow:0 6px 18px rgba(0,0,0,.16);
 }
 
 .mini-card b {
     color:white;
-    font-size:1.03rem;
+    font-size:1.05rem;
 }
 
 .mini-card span {
@@ -179,15 +231,14 @@ st.markdown("""
     background:linear-gradient(145deg,#102B49,#15395E);
     border:1px solid #3475A8;
     border-radius:20px;
-    padding:22px;
+    padding:20px;
 }
 
 div[data-testid="stChatMessage"] {
+    background:rgba(13,37,64,.96);
     border:1px solid #294D70;
     border-radius:16px;
-    padding:12px;
-    background:rgba(13,37,64,.94);
-    color:#F4F8FC;
+    padding:14px;
 }
 
 div[data-testid="stChatMessage"] p,
@@ -201,160 +252,206 @@ div[data-testid="stChatMessage"] li {
     font-weight:600;
     background:linear-gradient(100deg,#174D7A,#176B9A);
     color:white;
+    min-height:42px;
 }
 
 .footer {
     text-align:center;
     color:#B5C9DC;
     font-size:.85rem;
-    padding:22px 0 8px;
+    padding:24px 0 8px;
+}
+
+[data-testid="stMetric"] {
+    background:#102B49;
+    padding:15px;
+    border-radius:14px;
+    border:1px solid #28527A;
 }
 
 </style>
 """, unsafe_allow_html=True)
 
 
-# =====================================================
-# AUTHENTICATION
-# =====================================================
+# =========================================================
+# SIGN UP PAGE
+# =========================================================
 
-def signup():
+def signup_page():
 
     st.markdown("""
     <div class="hero">
-        <h1>📝 Create Your Account</h1>
+        <h1>🎓 Create Your Account</h1>
         <p>Join Muhammad Abdullah School AI</p>
+        <p>Your personal school learning platform.</p>
     </div>
     """, unsafe_allow_html=True)
 
-    with st.form("signup_form"):
+    left, center, right = st.columns([1, 1.7, 1])
 
-        name = st.text_input(
-            "Full Name",
-            placeholder="Enter your full name"
-        )
+    with center:
 
-        email = st.text_input(
-            "Email Address",
-            placeholder="example@email.com"
-        )
+        st.markdown("### 📝 Student Registration")
 
-        grade = st.selectbox(
-            "Choose Your Class",
-            [f"Class {n}" for n in range(1, 11)]
-        )
+        with st.form("registration_form"):
 
-        password = st.text_input(
-            "Create Password",
-            type="password"
-        )
+            name = st.text_input(
+                "Full Name",
+                placeholder="Enter your full name"
+            )
 
-        confirm = st.text_input(
-            "Confirm Password",
-            type="password"
-        )
+            email = st.text_input(
+                "Email Address",
+                placeholder="example@email.com"
+            )
 
-        submitted = st.form_submit_button(
-            "Create Account",
+            grade = st.selectbox(
+                "Select Your Class",
+                [f"Class {i}" for i in range(1, 11)]
+            )
+
+            password = st.text_input(
+                "Create Password",
+                type="password"
+            )
+
+            confirm = st.text_input(
+                "Confirm Password",
+                type="password"
+            )
+
+            agree = st.checkbox(
+                "I confirm that the information is correct."
+            )
+
+            submit = st.form_submit_button(
+                "🚀 Create Account",
+                use_container_width=True
+            )
+
+            if submit:
+
+                users = load_users()
+                email = email.strip().lower()
+
+                if not name.strip() or not email or not password:
+                    st.error("Please complete all required fields.")
+
+                elif not re.fullmatch(
+                    r"[^@\s]+@[^@\s]+\.[^@\s]+",
+                    email
+                ):
+                    st.error("Please enter a valid email.")
+
+                elif len(password) < 8:
+                    st.error("Password must be at least 8 characters.")
+
+                elif password != confirm:
+                    st.error("Passwords do not match.")
+
+                elif not agree:
+                    st.error("Please confirm your information.")
+
+                elif email in users:
+                    st.error("This account already exists. Please sign in.")
+
+                else:
+
+                    users[email] = {
+                        "name": name.strip(),
+                        "grade": grade,
+                        "password": make_password(password),
+                        "created_at": datetime.now().isoformat()
+                    }
+
+                    save_users(users)
+
+                    # AUTOMATIC LOGIN AFTER SIGNUP
+                    login_user(email, users[email])
+
+        st.write("")
+
+        if st.button(
+            "Already have an account? Sign In",
             use_container_width=True
-        )
-
-        if submitted:
-
-            users = load_users()
-            email = email.strip().lower()
-
-            if not name.strip() or not email or not password:
-                st.error("Please complete all fields.")
-
-            elif not re.fullmatch(
-                r"[^@\s]+@[^@\s]+\.[^@\s]+", email
-            ):
-                st.error("Please enter a valid email address.")
-
-            elif len(password) < 8:
-                st.error("Password must be at least 8 characters.")
-
-            elif password != confirm:
-                st.error("Passwords do not match.")
-
-            elif email in users:
-                st.error("Account already exists. Please sign in.")
-
-            else:
-
-                password_data = create_password_hash(password)
-
-                users[email] = {
-                    "name": name.strip(),
-                    "grade": grade,
-                    "password": password_data
-                }
-
-                save_users(users)
-
-                st.success("Account created successfully!")
-                st.info("Now open Sign In and login to your account.")
+        ):
+            st.session_state.page = "signin"
+            st.rerun()
 
 
-def signin():
+# =========================================================
+# SIGN IN PAGE
+# =========================================================
+
+def signin_page():
 
     st.markdown("""
     <div class="hero">
-        <h1>🔐 Welcome Back</h1>
-        <p>Sign in to your School AI account</p>
+        <h1>🎓 Muhammad Abdullah School AI</h1>
+        <p>Welcome back to your smart learning platform.</p>
+        <p>Learn • Practice • Improve</p>
     </div>
     """, unsafe_allow_html=True)
 
-    with st.form("signin_form"):
+    left, center, right = st.columns([1, 1.7, 1])
 
-        email = st.text_input(
-            "Email Address",
-            placeholder="Enter your email"
-        )
+    with center:
 
-        password = st.text_input(
-            "Password",
-            type="password"
-        )
+        st.markdown("### 🔐 Student Sign In")
 
-        submitted = st.form_submit_button(
-            "Sign In",
+        with st.form("login_form"):
+
+            email = st.text_input(
+                "Email Address",
+                placeholder="Enter your registered email"
+            )
+
+            password = st.text_input(
+                "Password",
+                type="password"
+            )
+
+            submit = st.form_submit_button(
+                "🔓 Sign In",
+                use_container_width=True
+            )
+
+            if submit:
+
+                users = load_users()
+                email = email.strip().lower()
+                user = users.get(email)
+
+                if user and check_password(
+                    password,
+                    user.get("password", {})
+                ):
+
+                    login_user(email, user)
+
+                else:
+                    st.error("Incorrect email or password.")
+
+        st.write("")
+
+        if st.button(
+            "New Student? Create Account",
             use_container_width=True
-        )
-
-        if submitted:
-
-            users = load_users()
-            email = email.strip().lower()
-            user = users.get(email)
-
-            if user and verify_password(
-                password, user.get("password", {})
-            ):
-
-                st.session_state.logged_in = True
-                st.session_state.user_email = email
-                st.session_state.user_name = user["name"]
-                st.session_state.grade = user["grade"]
-                st.session_state.messages = []
-
-                st.rerun()
-
-            else:
-                st.error("Incorrect email or password.")
+        ):
+            st.session_state.page = "signup"
+            st.rerun()
 
 
-# =====================================================
-# OFFLINE KNOWLEDGE BASE
-# =====================================================
+# =========================================================
+# BUILT-IN OFFLINE KNOWLEDGE BASE
+# =========================================================
 
 KNOWLEDGE = {
 
     "photosynthesis": """
 ### 🌱 Photosynthesis
 
-Photosynthesis is the process by which green plants make food.
+Photosynthesis is the process by which green plants make their food.
 
 Plants need:
 1. Sunlight
@@ -362,6 +459,8 @@ Plants need:
 3. Carbon dioxide
 
 Oxygen is released during this process.
+
+**Remember:** Photosynthesis helps plants prepare food.
 """,
 
     "fraction": """
@@ -371,10 +470,11 @@ A fraction represents a part of a whole.
 
 Example: 1/2
 
-- 1 is the numerator.
-- 2 is the denominator.
+- 1 = Numerator
+- 2 = Denominator
 
-Example: Half of a pizza is 1/2.
+Example: If a pizza has two equal pieces and you take one,
+you have 1/2 of the pizza.
 """,
 
     "noun": """
@@ -383,28 +483,41 @@ Example: Half of a pizza is 1/2.
 A noun is the name of a person, place, animal or thing.
 
 Examples:
-- Teacher
-- School
-- Cat
-- Book
+- Person: Teacher
+- Place: School
+- Animal: Cat
+- Thing: Book
 """,
 
     "verb": """
 ### ✍️ Verb
 
-A verb tells an action or state.
+A verb tells us about an action or state.
 
 Examples:
 - Run
 - Eat
 - Write
 - Read
+- Play
+""",
+
+    "adjective": """
+### 📚 Adjective
+
+An adjective describes a noun.
+
+Examples:
+- Beautiful flower
+- Clever student
+- Red car
+- Tall building
 """,
 
     "planet": """
 ### 🌍 Solar System
 
-There are eight planets:
+There are eight planets in our solar system:
 
 1. Mercury
 2. Venus
@@ -421,11 +534,13 @@ There are eight planets:
 
 A computer is an electronic machine that processes data.
 
-Main components:
+Main parts:
 1. Input devices
 2. CPU
 3. Memory
 4. Output devices
+
+Examples of input devices: Keyboard and mouse.
 """,
 
     "water": """
@@ -435,7 +550,11 @@ Water is essential for life.
 
 Its chemical formula is H₂O.
 
-Water is used for drinking, cooking and cleaning.
+Uses:
+- Drinking
+- Cooking
+- Cleaning
+- Agriculture
 """,
 
     "pakistan": """
@@ -443,94 +562,207 @@ Water is used for drinking, cooking and cleaning.
 
 Pakistan became independent on 14 August 1947.
 
-Its founder was Quaid-e-Azam Muhammad Ali Jinnah.
+Founder: Quaid-e-Azam Muhammad Ali Jinnah.
 
-Its capital is Islamabad.
+Capital: Islamabad.
+
+National language: Urdu.
 """,
 
     "gravity": """
 ### 🌎 Gravity
 
-Gravity is a force that attracts objects toward each other.
+Gravity is a force of attraction between objects.
 
-Earth's gravity keeps us on the ground.
+Earth's gravity keeps us on the ground
+and causes objects to fall toward Earth.
+""",
+
+    "solar system": """
+### ☀️ Solar System
+
+The solar system consists of the Sun
+and the objects that orbit around it.
+
+It includes eight planets, moons,
+asteroids and comets.
+""",
+
+    "atom": """
+### ⚛️ Atom
+
+An atom is the basic unit of an element.
+
+It contains:
+1. Protons
+2. Neutrons
+3. Electrons
+""",
+
+    "democracy": """
+### 🏛️ Democracy
+
+Democracy is a system of government
+in which people participate in choosing their leaders.
 """
 }
 
 
-# =====================================================
-# OFFLINE ANSWER ENGINE
-# =====================================================
+# =========================================================
+# SAFE MATHEMATICS CALCULATOR
+# =========================================================
+
+OPERATORS = {
+    ast.Add: operator.add,
+    ast.Sub: operator.sub,
+    ast.Mult: operator.mul,
+    ast.Div: operator.truediv,
+    ast.Pow: operator.pow,
+    ast.USub: operator.neg,
+    ast.UAdd: operator.pos
+}
+
+
+def calculate_expression(expression):
+
+    try:
+
+        if len(expression) > 60:
+            return None
+
+        tree = ast.parse(expression, mode="eval")
+
+        def evaluate(node):
+
+            if isinstance(node, ast.Expression):
+                return evaluate(node.body)
+
+            if isinstance(node, ast.Constant):
+                if type(node.value) in (int, float):
+                    return node.value
+                raise ValueError()
+
+            if isinstance(node, ast.BinOp):
+                operation = OPERATORS.get(type(node.op))
+
+                if operation is None:
+                    raise ValueError()
+
+                left = evaluate(node.left)
+                right = evaluate(node.right)
+
+                if isinstance(node.op, ast.Pow) and abs(right) > 10:
+                    raise ValueError()
+
+                result = operation(left, right)
+
+                if abs(result) > 10**15:
+                    raise ValueError()
+
+                return result
+
+            if isinstance(node, ast.UnaryOp):
+                operation = OPERATORS.get(type(node.op))
+
+                if operation is None:
+                    raise ValueError()
+
+                return operation(evaluate(node.operand))
+
+            raise ValueError()
+
+        result = evaluate(tree)
+
+        if not isinstance(result, (int, float)):
+            return None
+
+        return result
+
+    except (
+        ValueError,
+        TypeError,
+        SyntaxError,
+        ZeroDivisionError,
+        OverflowError
+    ):
+        return None
+
+
+# =========================================================
+# CHATBOT RESPONSE ENGINE
+# =========================================================
 
 def get_answer(question, subject, language, mode, grade):
 
     q = question.lower().strip()
 
-    greetings = ["hello", "hi", "hey", "salam", "assalam"]
+    # GREETINGS
+    if any(word in q for word in [
+        "hello", "hi", "hey", "salam",
+        "assalam", "good morning", "good evening"
+    ]):
 
-    if any(word in q for word in greetings):
-
-        return """
-Hello! 👋
+        return f"""
+Hello {st.session_state.user_name}! 👋
 
 Welcome to **Muhammad Abdullah School AI**.
 
-I am your offline school study assistant.
+I am your offline study assistant.
 
-Ask me about Mathematics, English, Science and other subjects.
+Your class: **{grade}**
+
+You can ask me about:
+- Mathematics
+- English
+- Urdu
+- Science
+- Computer
+- Pakistan Studies
+
+How can I help you today?
 """
 
-    # Knowledge search
+    # BUILT-IN KNOWLEDGE
     for keyword, answer in KNOWLEDGE.items():
 
         if keyword in q:
             return answer
 
-    # Basic calculator
-    if re.fullmatch(r"\s*\d+\s*[\+\-\*/]\s*\d+\s*", q):
+    # MATHEMATICS
+    if re.fullmatch(r"[\d\s+\-*/().]+", q):
 
-        parts = re.match(
-            r"\s*(\d+)\s*([\+\-\*/])\s*(\d+)\s*", q
-        )
+        result = calculate_expression(q)
 
-        a = int(parts.group(1))
-        op = parts.group(2)
-        b = int(parts.group(3))
-
-        if op == "+":
-            result = a + b
-        elif op == "-":
-            result = a - b
-        elif op == "*":
-            result = a * b
-        else:
-            if b == 0:
-                return "Division by zero is not allowed."
-            result = a / b
-
-        return f"""
+        if result is not None:
+            return f"""
 ### 🧮 Mathematics Answer
 
-{a} {op} {b} = **{result}**
+**Question:** `{question}`
 
-Great job! Keep practising.
+**Answer:** {result}
+
+Great work! Keep practising.
 """
 
-    # Quiz
-    if "quiz" in q or mode == "Create a practice quiz":
+    # QUIZ GENERATOR
+    if "quiz" in q or mode == "Create Practice Quiz":
 
         return """
-### 📝 Practice Quiz
+### 📝 School Practice Quiz
 
-1. What is photosynthesis?
-2. What is a noun?
-3. How many planets are in our solar system?
-4. What is the chemical formula of water?
-5. Who founded Pakistan?
+**Question 1:** What is photosynthesis?
 
-Try answering these questions!
+**Question 2:** What is a noun?
 
-**Answer Key:**
+**Question 3:** How many planets are in our solar system?
+
+**Question 4:** What is the chemical formula of water?
+
+**Question 5:** Who founded Pakistan?
+
+---
+
+### Answer Key
 
 1. Process by which plants make food.
 2. Name of a person, place, animal or thing.
@@ -539,41 +771,49 @@ Try answering these questions!
 5. Muhammad Ali Jinnah.
 """
 
-    # Notes
-    if "note" in q or mode == "Make short revision notes":
+    # REVISION NOTES
+    if mode == "Make Revision Notes" or "notes" in q:
 
-        return """
+        return f"""
 ### 📚 Revision Notes
 
-- Read your topic carefully.
-- Learn important definitions.
-- Remember key points.
-- Practise examples.
-- Revise regularly.
+**Selected Subject:** {subject}
 
-Ask about a specific topic for more focused notes.
+**Student Class:** {grade}
+
+1. Read the topic carefully.
+2. Learn important definitions.
+3. Remember the main points.
+4. Practise examples.
+5. Revise regularly.
+
+For detailed notes, ask about a specific topic.
 """
 
-    # Examples
-    if mode == "Give examples":
+    # EXAMPLES
+    if mode == "Give Examples":
 
         return """
-### ✍️ Examples
+### ✍️ Educational Examples
 
-**Noun:** Book, School, Teacher.
+**Noun:** Book, Teacher, School.
 
-**Verb:** Run, Write, Read.
+**Verb:** Run, Read, Write.
 
-**Adjective:** Beautiful, Happy, Clever.
+**Adjective:** Beautiful, Clever, Happy.
 
-**Number:** 2 + 2 = 4.
+**Mathematics:** 5 + 5 = 10.
+
+**Science:** Water = H₂O.
 """
 
+    # LANGUAGE
     if language == "Urdu":
-        return """
-مجھے اس سوال کا جواب اپنے آف لائن ڈیٹا میں نہیں ملا۔
 
-آپ ان موضوعات کے بارے میں سوال پوچھ سکتے ہیں:
+        return """
+مجھے اس سوال کا مکمل جواب اپنے آف لائن ڈیٹا میں نہیں ملا۔
+
+آپ ان موضوعات کے بارے میں پوچھ سکتے ہیں:
 
 - Photosynthesis
 - Fractions
@@ -583,9 +823,12 @@ Ask about a specific topic for more focused notes.
 - Computer
 - Water
 - Pakistan
+
+میں آپ کے سوالات کے مطابق اپنے موجودہ علم سے مدد کرنے کی کوشش کروں گا۔
 """
 
     if language == "Roman Urdu":
+
         return """
 Mujhe is sawal ka jawab apne offline data mein nahi mila.
 
@@ -599,254 +842,253 @@ Aap in topics ke bare mein pooch sakte hain:
 - Computer
 - Water
 - Pakistan
+
+Aap apna sawal kisi specific topic ke sath likhein.
 """
 
-    return """
-I don't have an offline answer for this question yet. 😊
+    # DEFAULT
+    return f"""
+### 🎓 Muhammad Abdullah School AI
 
-Try asking about:
+I couldn't find a matching answer in my offline knowledge base.
 
-- Photosynthesis
-- Fractions
-- Noun
-- Verb
-- Planets
-- Computer
-- Water
-- Pakistan
+**Your Class:** {grade}
 
-**Note:** This chatbot uses a built-in knowledge base, not a live AI model.
+**Selected Subject:** {subject}
+
+**Try asking:**
+
+- What is photosynthesis?
+- Explain fractions.
+- What is a noun?
+- What is a verb?
+- Explain planets.
+- What is gravity?
+- What is a computer?
+- Tell me about Pakistan.
+
+**Study Tip:** Ask one clear question at a time.
+
+<small>This is a rule-based offline chatbot, not a live generative AI model.</small>
 """
 
 
-# =====================================================
-# LOGIN SCREEN
-# =====================================================
+# =========================================================
+# CHAT PAGE
+# =========================================================
 
-if not st.session_state.logged_in:
+def chatbot_page():
 
+    # SIDEBAR
+    with st.sidebar:
+
+        st.title("🎓 School AI")
+
+        st.caption("Student Dashboard")
+
+        st.divider()
+
+        st.success(
+            "👤 " + st.session_state.user_name
+        )
+
+        st.write(
+            "🎓 " + st.session_state.grade
+        )
+
+        st.divider()
+
+        if st.button("➕ New Chat", use_container_width=True):
+
+            st.session_state.messages = []
+            st.session_state.new_chat_count += 1
+            st.rerun()
+
+        subject = st.selectbox(
+            "📚 Choose Subject",
+            SUBJECTS
+        )
+
+        language = st.selectbox(
+            "🌐 Answer Language",
+            LANGUAGES
+        )
+
+        mode = st.selectbox(
+            "🧠 Study Mode",
+            STUDY_MODES
+        )
+
+        st.divider()
+
+        st.caption("LEARN • PRACTISE • IMPROVE")
+
+        with st.expander("👤 Student Profile"):
+
+            st.write("**Name:** " + st.session_state.user_name)
+            st.write("**Email:** " + st.session_state.user_email)
+            st.write("**Class:** " + st.session_state.grade)
+
+        st.divider()
+
+        if st.button("🗑️ Clear Chat", use_container_width=True):
+
+            st.session_state.messages = []
+            st.rerun()
+
+        if st.button("🚪 Logout", use_container_width=True):
+
+            logout_user()
+
+    # HEADER
     st.markdown("""
     <div class="hero">
         <h1>🎓 Muhammad Abdullah School AI</h1>
-        <p>Your Smart Offline Educational Assistant</p>
+        <p>Your smart and friendly school learning assistant.</p>
         <p>Learn • Practice • Improve</p>
     </div>
     """, unsafe_allow_html=True)
 
+    # WELCOME
     st.markdown(
-        "<h3 style='text-align:center'>Welcome to School AI</h3>",
-        unsafe_allow_html=True
+        f"### Hello, {st.session_state.user_name}! 👋"
     )
 
-    col1, col2, col3 = st.columns([1, 2, 1])
+    st.caption(
+        "Your personal educational assistant is ready."
+    )
 
-    with col2:
+    # FEATURE CARDS
+    c1, c2, c3 = st.columns(3)
 
-        tab1, tab2 = st.tabs([
-            "🔐 Sign In",
-            "📝 Sign Up"
-        ])
+    for col, heading, detail in [
+        (c1, "📚 Classes 1–10", "School-level learning"),
+        (c2, "🧠 All Subjects", "Multiple study subjects"),
+        (c3, "✍️ Study Tools", "Notes, quizzes and maths")
+    ]:
 
-        with tab1:
-            signin()
+        col.markdown(
+            f"""
+            <div class="mini-card">
+                <b>{heading}</b><br>
+                <span>{detail}</span>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
-        with tab2:
-            signup()
+    st.write("")
 
+    # SUGGESTIONS
+    with st.expander("💡 Try These Questions"):
+
+        suggestions = [
+            "What is photosynthesis?",
+            "Explain fractions",
+            "What is a noun?",
+            "What is gravity?",
+            "Tell me about Pakistan",
+            "Create a quiz"
+        ]
+
+        for item in suggestions:
+
+            if st.button(item, key="suggest_" + item):
+                st.session_state.messages.append({
+                    "role": "user",
+                    "content": item
+                })
+
+                answer = get_answer(
+                    item,
+                    subject,
+                    language,
+                    mode,
+                    st.session_state.grade
+                )
+
+                st.session_state.messages.append({
+                    "role": "assistant",
+                    "content": answer
+                })
+
+                st.rerun()
+
+    st.divider()
+
+    st.subheader("💬 School AI Chat")
+
+    st.caption(
+        "Ask questions, learn topics and practise your lessons."
+    )
+
+    # CHAT HISTORY
+    for message in st.session_state.messages:
+
+        with st.chat_message(message["role"]):
+
+            st.markdown(message["content"])
+
+    # CHAT INPUT
+    question = st.chat_input(
+        "Message Muhammad Abdullah School AI..."
+    )
+
+    if question:
+
+        st.session_state.messages.append({
+            "role": "user",
+            "content": question
+        })
+
+        with st.chat_message("user"):
+            st.markdown(question)
+
+        with st.chat_message("assistant"):
+
+            with st.spinner("Preparing your answer..."):
+
+                answer = get_answer(
+                    question,
+                    subject,
+                    language,
+                    mode,
+                    st.session_state.grade
+                )
+
+                st.markdown(answer)
+
+        st.session_state.messages.append({
+            "role": "assistant",
+            "content": answer
+        })
+
+    # FOOTER
     st.markdown("""
     <div class="footer">
-    🎓 Muhammad Abdullah School AI<br>
-    Created by Muhammad Abdullah
+        🎓 Muhammad Abdullah School AI
+        <br>
+        Professional Offline Educational Platform
+        <br>
+        Created by Muhammad Abdullah
+        <br>
+        No API • No Gemini • No API Key
     </div>
     """, unsafe_allow_html=True)
 
-    st.stop()
 
+# =========================================================
+# APPLICATION ROUTER
+# =========================================================
 
-# =====================================================
-# SIDEBAR DASHBOARD
-# =====================================================
+if st.session_state.logged_in:
 
-with st.sidebar:
+    chatbot_page()
 
-    st.title("🎓 School AI")
+elif st.session_state.page == "signup":
 
-    st.caption("Student Dashboard")
+    signup_page()
 
-    st.divider()
+else:
 
-    st.success(
-        "Welcome, " + st.session_state.user_name
-    )
-
-    st.write("🎓 " + st.session_state.grade)
-
-    subject = st.selectbox(
-        "Choose Subject",
-        SUBJECTS
-    )
-
-    language = st.selectbox(
-        "Answer Language",
-        LANGUAGES
-    )
-
-    mode = st.selectbox(
-        "Study Mode",
-        STUDY_MODES
-    )
-
-    st.divider()
-
-    st.caption("Learn • Practise • Improve")
-
-    st.caption("Created by Muhammad Abdullah")
-
-    if st.button("🚪 Logout", use_container_width=True):
-
-        st.session_state.logged_in = False
-        st.session_state.messages = []
-
-        for key in [
-            "user_email",
-            "user_name",
-            "grade"
-        ]:
-            st.session_state.pop(key, None)
-
-        st.rerun()
-
-
-# =====================================================
-# MAIN HEADER
-# =====================================================
-
-st.markdown("""
-<div class="hero">
-    <h1>🎓 Muhammad Abdullah School AI</h1>
-    <p>
-    Your smart and friendly study companion —
-    understand lessons, practise questions and prepare confidently.
-    </p>
-</div>
-""", unsafe_allow_html=True)
-
-
-# =====================================================
-# FEATURE CARDS
-# =====================================================
-
-c1, c2, c3 = st.columns(3)
-
-for col, heading, detail in [
-    (c1, "📚 Classes 1–10", "Learning support by class level"),
-    (c2, "🧠 All Subjects", "Maths, languages and sciences"),
-    (c3, "✍️ Study Tools", "Notes, quizzes and examples"),
-]:
-
-    col.markdown(
-        f"""
-        <div class="mini-card">
-            <b>{heading}</b><br>
-            <span>{detail}</span>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-
-st.write("")
-
-with st.expander("📖 Subjects and Features"):
-
-    st.write(", ".join(SUBJECTS[1:]))
-
-    st.write(
-        "Ask for topic explanations, homework guidance, "
-        "examples, revision notes and practice quizzes."
-    )
-
-
-# =====================================================
-# CHAT INTERFACE
-# =====================================================
-
-st.subheader(
-    "💬 Study Chat — " + st.session_state.user_name
-)
-
-st.caption(
-    "Ask your school questions. This chatbot works offline."
-)
-
-# Display previous messages
-for message in st.session_state.messages:
-
-    with st.chat_message(message["role"]):
-
-        st.markdown(message["content"])
-
-
-# Chat Input
-question = st.chat_input(
-    "Ask a question about your school subjects..."
-)
-
-if question:
-
-    st.session_state.messages.append({
-        "role": "user",
-        "content": question
-    })
-
-    with st.chat_message("user"):
-        st.markdown(question)
-
-    with st.chat_message("assistant"):
-
-        with st.spinner("Preparing your study answer..."):
-
-            answer = get_answer(
-                question,
-                subject,
-                language,
-                mode,
-                st.session_state.grade
-            )
-
-            st.markdown(answer)
-
-    st.session_state.messages.append({
-        "role": "assistant",
-        "content": answer
-    })
-
-
-# =====================================================
-# CLEAR CHAT
-# =====================================================
-
-if st.session_state.messages:
-
-    if st.button("🗑️ Clear Conversation"):
-
-        st.session_state.messages = []
-
-        st.rerun()
-
-
-# =====================================================
-# FOOTER
-# =====================================================
-
-st.markdown("""
-<div class="footer">
-🎓 Muhammad Abdullah School AI
-<br>
-Professional Offline Educational Assistant
-<br>
-Created by Muhammad Abdullah
-<br>
-No API • No Gemini • No API Key
-</div>
-""", unsafe_allow_html=True)
+    signin_page()
