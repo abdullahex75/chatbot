@@ -1,323 +1,466 @@
 
-import streamlit as st
 import os
+from pathlib import Path
 
-# ==========================================
-# MUHAMMAD ABDULLAH - SCHOOL AI CHATBOT
-# ==========================================
+import streamlit as st
+
+# ============================================================
+# MUHAMMAD ABDULLAH SCHOOL AI
+# A Streamlit study assistant for Classes 1–10
+# ============================================================
 
 st.set_page_config(
     page_title="Muhammad Abdullah | School AI",
     page_icon="🎓",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded",
 )
 
-# Professional Design
-st.markdown("""
-<style>
-.stApp {
-    background: #f3f6fc;
-}
-.main-title {
-    background: linear-gradient(120deg, #102a43, #176b87);
-    padding: 30px;
-    border-radius: 18px;
-    color: white;
-    text-align: center;
-}
-.main-title h1 {
-    color: white;
-}
-.main-title p {
-    color: #e0f2fe;
-}
-.stButton button {
-    background: #176b87;
-    color: white;
-    border-radius: 10px;
-}
-</style>
-""", unsafe_allow_html=True)
+APP_DIR = Path(__file__).parent
+PROFILE_IMAGE = APP_DIR / "muhammad_abdullah.png"
 
-# Sidebar
+SUBJECTS = [
+    "All Subjects", "Mathematics", "English", "Urdu",
+    "General Science", "Physics", "Chemistry", "Biology",
+    "Computer Science", "Islamiyat", "Pakistan Studies",
+    "Social Studies", "History", "Geography",
+]
+
+LANGUAGES = ["Simple English", "Urdu", "Roman Urdu"]
+
+STUDY_MODES = [
+    "Explain a topic",
+    "Solve homework step by step",
+    "Make short revision notes",
+    "Create a practice quiz",
+    "Prepare for an exam",
+    "Give examples",
+    "Explain difficult words",
+    "Check my understanding",
+]
+
+# ----------------------------- DESIGN -----------------------------
+
+st.markdown(
+    """
+    <style>
+    :root {
+        --navy: #102A43;
+        --teal: #0F8B8D;
+        --ice: #EAF4F7;
+    }
+
+    .stApp {
+        background: linear-gradient(
+            180deg,
+            #F5F8FC 0%,
+            #EEF4F8 100%
+        );
+    }
+
+    [data-testid="stSidebar"] {
+        background: linear-gradient(
+            180deg,
+            #102A43 0%,
+            #173F5F 100%
+        );
+    }
+
+    [data-testid="stSidebar"] * {
+        color: #F4F8FC !important;
+    }
+
+    [data-testid="stSidebar"] input,
+    [data-testid="stSidebar"] [data-baseweb="select"] > div {
+        color: #102A43 !important;
+        background: #FFFFFF !important;
+    }
+
+    .hero {
+        padding: 28px 30px;
+        border-radius: 22px;
+        color: white;
+        background: linear-gradient(
+            115deg,
+            #102A43 0%,
+            #176B87 58%,
+            #0F8B8D 100%
+        );
+        box-shadow: 0 12px 28px rgba(16,42,67,.14);
+        margin-bottom: 18px;
+    }
+
+    .hero h1 {
+        color: white !important;
+        font-size: 2.1rem;
+        margin: 0;
+    }
+
+    .hero p {
+        color: #E5F5FA !important;
+        margin: 8px 0 0 0;
+    }
+
+    .mini-card {
+        background: white;
+        border: 1px solid #DCE7EF;
+        border-radius: 16px;
+        padding: 16px;
+        min-height: 92px;
+        box-shadow: 0 4px 14px rgba(16,42,67,.04);
+    }
+
+    .mini-card b {
+        color: #102A43;
+        font-size: 1.03rem;
+    }
+
+    .mini-card span {
+        color: #587084;
+        font-size: .88rem;
+    }
+
+    div[data-testid="stChatMessage"] {
+        border: 1px solid #E0E9F0;
+        border-radius: 16px;
+        padding: 12px;
+        background: rgba(255,255,255,.88);
+    }
+
+    .footer {
+        text-align: center;
+        color: #647B8D;
+        font-size: .85rem;
+        padding: 18px 0 8px;
+    }
+
+    .stButton button {
+        border-radius: 12px;
+        border: 0;
+        font-weight: 600;
+        background: linear-gradient(
+            100deg,
+            #176B87,
+            #0F8B8D
+        );
+        color: white;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+# ----------------------------- SIDEBAR -----------------------------
+
 with st.sidebar:
-    st.title("🎓 Muhammad Abdullah")
-    st.caption("Your School AI Assistant")
+
+    if PROFILE_IMAGE.is_file():
+        st.image(str(PROFILE_IMAGE), width=138)
+
+    st.title("Muhammad Abdullah")
+    st.caption("🎓 School AI • Classes 1–10")
+
     st.divider()
 
-    student = st.text_input("Your Name")
+    student_name = st.text_input(
+        "Student name (optional)",
+        placeholder="Your name"
+    )
 
     grade = st.selectbox(
-        "Select Your Class",
-        [f"Class {i}" for i in range(1, 11)]
+        "Choose your class",
+        [f"Class {n}" for n in range(1, 11)]
     )
 
     subject = st.selectbox(
-        "Select Subject",
-        [
-            "All Subjects",
-            "Mathematics",
-            "English",
-            "Urdu",
-            "Science",
-            "Physics",
-            "Chemistry",
-            "Biology",
-            "Computer Science",
-            "Islamiyat",
-            "Pakistan Studies",
-            "Social Studies",
-            "History",
-            "Geography"
-        ]
+        "Choose a subject",
+        SUBJECTS
     )
 
     language = st.selectbox(
-        "Answer Language",
-        ["English", "Urdu", "Roman Urdu"]
+        "Answer language",
+        LANGUAGES
     )
 
-    mode = st.selectbox(
-        "Study Help",
-        [
-            "Explain Topic",
-            "Homework Help",
-            "Step-by-Step Solution",
-            "Make Short Notes",
-            "Create Quiz",
-            "Exam Preparation",
-            "Give Examples",
-            "Explain Difficult Words"
-        ]
+    study_mode = st.selectbox(
+        "How can I help?",
+        STUDY_MODES
     )
 
     st.divider()
-    st.write("Created by Muhammad Abdullah ❤️")
 
-# Main Header
-st.markdown("""
-<div class="main-title">
-<h1>🎓 Muhammad Abdullah</h1>
-<h2>School AI Chatbot</h2>
-<p>Your Smart Learning Partner | Classes 1 to 10</p>
-</div>
-""", unsafe_allow_html=True)
+    st.caption("Learn • Practise • Improve")
+    st.caption("Created by Muhammad Abdullah")
+
+# ----------------------------- HEADER -----------------------------
+
+st.markdown(
+    """
+    <div class="hero">
+        <h1>🎓 Muhammad Abdullah School AI</h1>
+        <p>
+            Your smart and friendly study companion —
+            understand lessons, practise questions and
+            prepare confidently for school.
+        </p>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+c1, c2, c3 = st.columns(3)
+
+for col, heading, detail in [
+    (
+        c1,
+        "📚 Classes 1–10",
+        "Learning support by class level"
+    ),
+    (
+        c2,
+        "🧠 All major subjects",
+        "Maths, languages, sciences and more"
+    ),
+    (
+        c3,
+        "✍️ Study tools",
+        "Notes, quizzes and homework guidance"
+    ),
+]:
+    col.markdown(
+        f"""
+        <div class="mini-card">
+            <b>{heading}</b><br>
+            <span>{detail}</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 st.write("")
 
-# Features
-col1, col2, col3 = st.columns(3)
+with st.expander("📖 Subjects and features"):
 
-col1.info("📚 All School Subjects")
-col2.info("🧠 Smart Study Help")
-col3.info("✍️ Homework Assistant")
+    st.write(", ".join(SUBJECTS[1:]))
 
-st.subheader("🤖 Ask Muhammad Abdullah AI")
+    st.write(
+        "Ask for topic explanations, step-by-step homework guidance, "
+        "examples, revision notes, practice quizzes and exam preparation."
+    )
 
-st.write(
-    "Ask questions, understand lessons, "
-    "prepare for exams and improve your knowledge!"
-)
+# ----------------------------- AI CONFIGURATION -----------------------------
 
-# Gemini API
 def get_api_key():
+    """Read the Gemini key from Streamlit Secrets or environment variables."""
+
     try:
-        return st.secrets.get("GEMINI_API_KEY", "")
+        key = st.secrets.get("GEMINI_API_KEY", "")
+
+        if key:
+            return key
+
     except Exception:
-        return os.getenv("GEMINI_API_KEY", "")
+        pass
 
-# AI Prompt
-def create_prompt(question):
+    return os.getenv("GEMINI_API_KEY", "")
+
+
+def build_prompt(question: str) -> str:
+
+    learner = student_name.strip() or "the student"
+
     return f"""
-You are Muhammad Abdullah School AI.
+You are Muhammad Abdullah School AI, a patient,
+accurate and encouraging school tutor.
 
-Student: {student or 'Student'}
+Student: {learner}
 Class: {grade}
-Subject: {subject}
-Language: {language}
-Study Mode: {mode}
+Selected subject: {subject}
+Answer language: {language}
+Requested study mode: {study_mode}
 
-Student Question:
+Student's question:
 {question}
 
-Instructions:
-1. Give accurate educational answers.
-2. Use language suitable for the student's class.
-3. Explain difficult concepts simply.
-4. Show mathematics solutions step by step.
-5. Give examples where useful.
-6. Help with English and Urdu grammar.
-7. Explain science topics clearly.
-8. Help students understand homework.
-9. Create 5 questions for quiz requests.
-10. Include an answer key for quizzes.
-11. Help students prepare for examinations.
-12. Be friendly, respectful and encouraging.
-13. Never invent facts.
-14. If unsure, explain that you are unsure.
+Teaching requirements:
+
+- Match explanations to the student's class.
+- Use age-appropriate language.
+- Answer in the selected language.
+- For Urdu, use Urdu script.
+- For Roman Urdu, use Roman Urdu.
+- Explain concepts clearly in small steps.
+- Include examples when useful.
+- For mathematics, show the working and verify the answer.
+- For science, explain the concept with a real-life example.
+- For English and Urdu, help with grammar and vocabulary.
+- For quizzes, create five suitable questions.
+- Put the quiz answer key under a separate heading.
+- For exam preparation, include key points and practice.
+- Guide students to understand their homework.
+- Never invent textbook page numbers or facts.
+- If the question is unclear, ask one short question.
+- Be respectful, supportive and concise.
 """
 
-# Basic Offline Help
-def offline_answer(question):
+
+def offline_answer(question: str) -> str:
+    """Small sample responses when the AI service is not connected."""
+
     q = question.lower()
 
+    if any(
+        word in q
+        for word in ("hello", "hi", "salam", "assalam")
+    ):
+        return (
+            "Hello! 👋 Welcome to **Muhammad Abdullah School AI**. "
+            "Ask me a question from any school subject."
+        )
+
     if "photosynthesis" in q:
-        return """
-### 🌱 Photosynthesis
+        return (
+            "**Photosynthesis** is the process by which green plants "
+            "make food. Plants use sunlight, water and carbon dioxide. "
+            "The process mainly happens in leaves, and oxygen is released."
+        )
 
-Photosynthesis is the process by which green
-plants make their own food.
+    if "fraction" in q:
+        return (
+            "A **fraction** represents part of a whole. "
+            "In **1/2**, 1 is the numerator and 2 is the denominator. "
+            "It means one of two equal parts."
+        )
 
-Plants need:
-- Sunlight
-- Water
-- Carbon dioxide
+    if "noun" in q:
+        return (
+            "A **noun** names a person, place, animal or thing. "
+            "Examples: teacher, school, cat and book."
+        )
 
-Oxygen is released during this process.
-"""
+    if "verb" in q:
+        return (
+            "A **verb** tells an action or a state. "
+            "Examples: read, write, run, is and are."
+        )
 
-    elif "fraction" in q:
-        return """
-### ➗ Fractions
+    return (
+        "The AI service is not connected yet. Add your Gemini API key "
+        "under **Streamlit Cloud → App settings → Secrets** to enable "
+        "answers across subjects.\n\n"
+        "For now, try: photosynthesis, fraction, noun or verb."
+    )
 
-A fraction represents a part of a whole.
+# ----------------------------- CHAT -----------------------------
 
-Example: 1/2
-
-1 = Numerator
-2 = Denominator
-
-It means one out of two equal parts.
-"""
-
-    elif "noun" in q:
-        return """
-### 📖 Noun
-
-A noun is the name of a person, place,
-animal or thing.
-
-Examples:
-- Ali
-- School
-- Cat
-- Book
-"""
-
-    elif "verb" in q:
-        return """
-### 📖 Verb
-
-A verb is an action or being word.
-
-Examples:
-- Read
-- Write
-- Play
-- Run
-"""
-
-    return """
-### ⚙️ AI Not Connected
-
-Please add your Gemini API key in
-Streamlit Secrets to enable intelligent
-answers across all school subjects.
-
-You can still try:
-- Photosynthesis
-- Fractions
-- Nouns
-- Verbs
-"""
-
-# Chat History
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
 for message in st.session_state.messages:
+
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# Chat Input
-question = st.chat_input("Ask your school question here...")
+question = st.chat_input(
+    "Ask a question about your school subjects…"
+)
 
 if question:
 
-    st.session_state.messages.append({
-        "role": "user",
-        "content": question
-    })
+    st.session_state.messages.append(
+        {"role": "user", "content": question}
+    )
 
     with st.chat_message("user"):
-        st.write(question)
+        st.markdown(question)
 
     with st.chat_message("assistant"):
 
-        with st.spinner("Muhammad Abdullah AI is thinking..."):
+        with st.spinner("Preparing your study answer…"):
 
             api_key = get_api_key()
 
-            if api_key:
+            if not api_key:
+
+                answer = offline_answer(question)
+
+            else:
+
                 try:
                     from google import genai
 
-                    client = genai.Client(api_key=api_key)
-
-                    response = client.models.generate_content(
-                        model="gemini-2.5-flash",
-                        contents=create_prompt(question)
+                    client = genai.Client(
+                        api_key=api_key
                     )
 
-                    answer = response.text
+                    result = client.models.generate_content(
+                        model="gemini-2.5-flash",
+                        contents=build_prompt(question),
+                    )
+
+                    answer = (
+                        result.text
+                        or "I couldn't prepare an answer. Please try again."
+                    )
 
                 except Exception:
-                    answer = (
-                        "AI connection failed. Please check "
-                        "your Gemini API key and try again."
-                    )
 
-            else:
-                answer = offline_answer(question)
+                    answer = (
+                        "I couldn't connect to the AI service. "
+                        "Please check that your Gemini API key is correct "
+                        "in Streamlit Secrets, then restart the app."
+                    )
 
             st.markdown(answer)
 
-    st.session_state.messages.append({
-        "role": "assistant",
-        "content": answer
-    })
+    st.session_state.messages.append(
+        {"role": "assistant", "content": answer}
+    )
 
-# Clear Chat
 if st.session_state.messages:
-    if st.button("🗑️ Clear Chat"):
+
+    if st.button("🗑️ Clear conversation"):
+
         st.session_state.messages = []
         st.rerun()
 
-# Footer
-st.divider()
+# ----------------------------- SETUP HELP -----------------------------
 
-st.markdown("""
-<div style="text-align:center">
-<h3>🎓 Muhammad Abdullah</h3>
-<p>School AI Chatbot | Classes 1–10</p>
-<p>Made with ❤️ by Muhammad Abdullah</p>
-</div>
-""", unsafe_allow_html=True)
-
-# API Setup Instructions
 with st.expander("⚙️ AI Setup Instructions"):
 
-    st.write("""
-    To activate full AI answers:
+    st.markdown(
+        """
+**To activate full AI answers:**
 
-    1. Get a Gemini API key from Google AI Studio.
-    2. Open Streamlit Community Cloud.
-    3. Open your app Settings → Secrets.
-    4. Add:
+1. Add `streamlit` and `google-genai` to your `requirements.txt`.
+2. Create a Gemini API key using Google AI Studio.
+3. Open your app in Streamlit Community Cloud.
+4. Go to **App settings → Secrets**.
+5. Add the setting shown below, replacing the example with your private key.
+        """
+    )
 
-    GEMINI_API_KEY = "YOUR_API_KEY"
+    st.code(
+        'GEMINI_API_KEY = "YOUR_PRIVATE_API_KEY"',
+        language="toml"
+    )
 
-    Never publish your private API key on GitHub.
-    """)
+    st.warning(
+        "Never put your private API key in this Python file "
+        "or commit it to a public GitHub repository."
+    )
 
+# ----------------------------- FOOTER -----------------------------
 
+st.markdown(
+    """
+    <div class="footer">
+        🎓 Muhammad Abdullah School AI
+        · Educational support for Classes 1–10
+        <br>
+        Check important answers against your textbook
+        and teacher’s instructions.
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
