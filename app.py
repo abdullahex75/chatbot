@@ -44,6 +44,7 @@ st.set_page_config(
 )
 
 APP_NAME = "Muhammad Abdullah School AI"
+APP_PASSWORD = "CES Abdullah"  # default password (secrets.toml can override it)
 MAX_LOGIN_ATTEMPTS = 5
 
 DATA_DIR = Path(os.getenv("SCHOOL_AI_DATA_DIR", "data"))
@@ -447,7 +448,7 @@ def login_screen() -> None:
 
     _, center, _ = st.columns([1, 1.3, 1])
     with center:
-        expected = get_secret("APP_PASSWORD")
+        expected = get_secret("APP_PASSWORD", APP_PASSWORD)
 
         if not expected:
             st.error("No password is configured.")
