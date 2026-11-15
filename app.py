@@ -12,14 +12,14 @@ from datetime import datetime, date
 # ==================================================
 
 st.set_page_config(
-    page_title="Muhammad Abdullah School AI",
+    page_title="Muhammad Abdullah",
     page_icon="🎓",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-APP_NAME = "Muhammad Abdullah School AI"
-APP_PASSWORD = "Muhammad Abdullah"
+APP_NAME = "School AI chatbot"
+APP_PASSWORD = "CES Abdullah"
 
 NOTES_FILE = "school_ai_notes.json"
 PLANNER_FILE = "school_ai_planner.json"
