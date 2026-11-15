@@ -68,7 +68,7 @@ SUBSCRIPTION_PLANS = {
 # 2. PAGE CONFIGURATION & CUSTOM CSS (CHATGPT-INSPIRED DARK NAVY/PURPLE UI)
 # ==============================================================================
 st.set_page_config(
-    page_title=School Chatbot,
+    page_title="School Chatbot",
     page_icon="🎓",
     layout="wide",
     initial_sidebar_state="expanded",
