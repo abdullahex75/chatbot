@@ -429,7 +429,7 @@ def check_conversational_intent(prompt: str, selected_class: str, selected_subje
         if has_wellbeing or "salam" in clean or "assalam" in clean or "aoa" in clean:
             return (
                 f"**Wa Alaikum Assalam & Hello {student_name}!** 👋😊\n\n"
-                f"Alhamdulillah, main bilkul theek aur tayyar hoon aapki parhai mein madad karne ke liye! Aap sunayein, aap kaise hain?\n\n"
+                f"Alhamdulillah, main bilकुल theek aur tayyar hoon aapki parhai mein madad karne ke liye! Aap sunayein, aap kaise hain?\n\n"
                 f"Abhi aap **{selected_class}** aur **{subj_icon} {selected_subject}** par kaam kar rahe hain. Batayein aaj hum kaunsa topic ya sawal samjhein?"
             )
         return (
@@ -789,4 +789,276 @@ def render_sidebar():
                     if st.button(label, key=f"open_chat_{cid}", use_container_width=True):
                         st.session_state.current_chat_id = cid
                         st.session_state.selected_class = chat.get("class", st.session_state.selected_class)
-                        st.session_state.selected_subject =
+                        st.session_state.selected_subject = chat.get("subject", st.session_state.selected_subject)
+                        st.session_state.active_view = "chat"
+                        st.rerun()
+                with c_del:
+                    if st.button("🗑️", key=f"del_chat_{cid}", use_container_width=True):
+                        delete_chat(cid)
+                        st.rerun()
+
+        st.markdown("---")
+
+        st.markdown("##### ⚡ Account Usage")
+        remaining = max(0, FREE_MESSAGE_LIMIT - st.session_state.messages_used)
+        progress_val = min(1.0, st.session_state.messages_used / FREE_MESSAGE_LIMIT)
+
+        if st.session_state.is_premium:
+            st.markdown(
+                f"""
+                <div class="sidebar-card">
+                    <div style="font-size: 0.82rem; font-weight: 700; color: #6ee7b7;">👑 Premium Active</div>
+                    <div style="font-size: 0.75rem; color: #cbd5e1; margin-top: 2px;">Plan: {st.session_state.subscription_plan_name}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                f"""
+                <div class="sidebar-card">
+                    <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:4px;">
+                        <span style="color:#cbd5e1; font-weight:600;">Free Plan</span>
+                        <span style="color:#c084fc; font-weight:700;">{remaining} / {FREE_MESSAGE_LIMIT} left</span>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            st.progress(progress_val)
+
+        if st.button("🎁 Claim Offer / Upgrade", use_container_width=True, type="primary", key="sb_claim_offer_btn"):
+            st.session_state.active_view = "subscription"
+            st.rerun()
+
+        st.markdown("---")
+        if st.button("🚪 Logout", use_container_width=True, key="sb_logout_btn"):
+            st.session_state.authenticated = False
+            st.rerun()
+
+
+# ==============================================================================
+# 8. PAYMENT & SUBSCRIPTION PAGE
+# ==============================================================================
+def render_payment_section():
+    st.markdown("---")
+    st.markdown("## 💳 JazzCash Payment")
+    st.info("Choose your plan and contact the administrator for manual payment verification.")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("### Weekly Plan")
+        st.subheader("PKR 200")
+        st.caption("7 Days Access")
+    with col2:
+        st.markdown("### Monthly Plan")
+        st.subheader("PKR 500")
+        st.caption("30 Days Access")
+
+    st.divider()
+    st.markdown("### 📱 Payment Details")
+    st.write("**JazzCash Number:**", JAZZCASH_NUMBER)
+    st.write("**Account Name:**", JAZZCASH_ACCOUNT_NAME)
+    st.warning("Payment ke baad administrator se contact karein. Premium access sirf payment verify hone ke baad activate hoga.")
+
+
+def render_subscription_page(limit_reached: bool = False):
+    if limit_reached:
+        st.markdown(
+            """
+            <div class="welcome-card" style="border-color: rgba(244, 63, 94, 0.55); text-align: center;">
+                <div style="font-size: 2.6rem; margin-bottom: 8px;">⏳</div>
+                <h2 style="color: #fda4af; font-weight: 800; margin-bottom: 6px;">
+                    You've reached your free usage limit.
+                </h2>
+                <p style="color: #cbd5e1; max-width: 620px; margin: 0 auto 14px auto; font-size: 0.96rem;">
+                    You have used all <strong>10 free AI tutor messages</strong>. Claim our student offer below to unlock uninterrupted study assistance.
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            """
+            <div class="welcome-card" style="text-align: center;">
+                <span class="popular-ribbon">🎁 Student Special Offer</span>
+                <h2 class="welcome-title">Upgrade to Muhammad Abdullah School AI Pro</h2>
+                <p style="color: #cbd5e1; max-width: 640px; margin: 0 auto; font-size: 0.95rem;">
+                    Choose a flexible study pass tailored for school exams and daily homework help.
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    col_weekly, col_monthly = st.columns(2, gap="large")
+    with col_weekly:
+        if st.button("Choose Weekly Plan (PKR 200)", use_container_width=True, key="choose_weekly_plan_btn"):
+            st.session_state.pending_plan_choice = "Weekly Plan — PKR 200"
+    with col_monthly:
+        if st.button("Choose Monthly Plan (PKR 500)", type="primary", use_container_width=True, key="choose_monthly_plan_btn"):
+            st.session_state.pending_plan_choice = "Monthly Plan — PKR 500"
+
+    if st.session_state.pending_plan_choice:
+        st.success(f"✅ **Selected Plan:** {st.session_state.pending_plan_choice} — Neeche diye gaye JazzCash details par payment bhej kar verify karwayein.")
+
+    render_payment_section()
+    if not limit_reached:
+        if st.button("⬅️ Back to Study Chat", key="back_to_chat_from_sub_btn"):
+            st.session_state.active_view = "chat"
+            st.rerun()
+
+
+# ==============================================================================
+# 9. STUDENT DASHBOARD VIEW
+# ==============================================================================
+def render_student_dashboard():
+    st.markdown(
+        f"""
+        <div class="welcome-card">
+            <h2 class="welcome-title">📊 Student Learning Dashboard</h2>
+            <p style="color:#cbd5e1; margin:0;">
+                Welcome back, <strong>{st.session_state.student_name}</strong>! Track your study sessions and active grade level.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    if st.button("💬 Return to AI Tutor Chat", type="primary", key="dash_return_chat_btn"):
+        st.session_state.active_view = "chat"
+        st.rerun()
+
+
+# ==============================================================================
+# 10. MAIN CHATBOT INTERFACE
+# ==============================================================================
+def render_chat_interface():
+    if (not st.session_state.is_premium) and (st.session_state.messages_used >= FREE_MESSAGE_LIMIT):
+        render_subscription_page(limit_reached=True)
+        return
+
+    current_chat = st.session_state.chats.get(st.session_state.current_chat_id)
+    if not current_chat:
+        create_new_chat(switch=True)
+        current_chat = st.session_state.chats[st.session_state.current_chat_id]
+
+    subj_icon = SUBJECTS.get(st.session_state.selected_subject, "📚")
+    remaining = max(0, FREE_MESSAGE_LIMIT - st.session_state.messages_used)
+
+    top_col1, top_col2 = st.columns([3.5, 1.2])
+    with top_col1:
+        st.markdown(
+            f"""
+            <div class="context-banner">
+                <div>
+                    <span class="badge-pill badge-class">🎓 {st.session_state.selected_class}</span>
+                    <span class="badge-pill badge-subject">{subj_icon} {st.session_state.selected_subject}</span>
+                    <span class="badge-pill badge-status">● AI Tutor Online</span>
+                </div>
+                <div style="font-size:0.8rem; color:#94a3b8;">
+                    Free Credits: <strong style="color:#c084fc;">{remaining}/{FREE_MESSAGE_LIMIT}</strong>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with top_col2:
+        act_c1, act_c2 = st.columns(2)
+        with act_c1:
+            if st.button("🧹 Clear", use_container_width=True, key="clear_current_chat_btn"):
+                current_chat["messages"] = []
+                current_chat["title"] = "New Study Session"
+                save_chats_to_disk(st.session_state.chats)
+                st.rerun()
+        with act_c2:
+            if st.button("➕ New", use_container_width=True, key="top_new_chat_btn"):
+                create_new_chat(switch=True)
+                st.rerun()
+
+    if not current_chat["messages"]:
+        st.markdown(
+            f"""
+            <div class="welcome-card">
+                <div class="welcome-title">Assalam-o-Alaikum, {st.session_state.student_name}! 👋</div>
+                <p style="color:#cbd5e1; font-size:0.98rem; line-height:1.6; margin-bottom:16px;">
+                    Welcome to <strong>{APP_TITLE}</strong>. Say <em>"Assalam-o-Alaikum"</em>, <em>"Hello"</em>, or ask any concept below!
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        suggestions = ["Assalam-o-Alaikum! Kya hal hai?", "Explain Pythagoras Theorem", "Solve 25 * 4 + 18"]
+        s_cols = st.columns(3)
+        for i, suggestion in enumerate(suggestions):
+            with s_cols[i]:
+                if st.button(f"💡 {suggestion}", use_container_width=True, key=f"starter_prompt_{i}"):
+                    process_user_message(suggestion, current_chat)
+                    st.rerun()
+
+    for idx, msg in enumerate(current_chat["messages"]):
+        role = msg["role"]
+        avatar = "🧑‍🎓" if role == "user" else "🤖"
+        with st.chat_message(role, avatar=avatar):
+            st.markdown(msg["content"])
+
+    user_input = st.chat_input(f"Type your message here ({st.session_state.selected_class} • {st.session_state.selected_subject})...")
+    if user_input and user_input.strip():
+        process_user_message(user_input.strip(), current_chat)
+        st.rerun()
+
+
+def process_user_message(prompt_text: str, current_chat: Dict[str, Any]):
+    if (not st.session_state.is_premium) and (st.session_state.messages_used >= FREE_MESSAGE_LIMIT):
+        st.session_state.active_view = "subscription"
+        return
+
+    now_str = datetime.datetime.now().strftime("%I:%M %p")
+    if not current_chat["messages"]:
+        current_chat["title"] = prompt_text[:38] + ("..." if len(prompt_text) > 38 else "")
+
+    current_chat["messages"].append({"role": "user", "content": prompt_text, "timestamp": now_str})
+
+    with st.spinner("🤖 Thinking..."):
+        time.sleep(0.3)
+        ai_reply = generate_educational_response(prompt_text, st.session_state.selected_class, st.session_state.selected_subject)
+
+    current_chat["messages"].append({"role": "assistant", "content": ai_reply, "timestamp": now_str})
+    current_chat["updated_at"] = datetime.datetime.now().strftime("%d %b %Y, %I:%M %p")
+    st.session_state.messages_used += 1
+    save_chats_to_disk(st.session_state.chats)
+
+
+# ==============================================================================
+# 11. MAIN ENTRY POINT
+# ==============================================================================
+def main():
+    inject_custom_css()
+    init_session_state()
+
+    if not st.session_state.authenticated:
+        render_login_page()
+        return
+
+    render_sidebar()
+
+    if st.session_state.active_view == "subscription":
+        render_subscription_page(limit_reached=((not st.session_state.is_premium) and (st.session_state.messages_used >= FREE_MESSAGE_LIMIT)))
+    elif st.session_state.active_view == "dashboard":
+        render_student_dashboard()
+    else:
+        render_chat_interface()
+
+    st.markdown(
+        f"""
+        <div class="custom-footer">
+            <strong>{APP_TITLE}</strong> • Empowering Students from Class 1 to Class 10 • Built with Streamlit
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+if __name__ == "__main__":
+    main()
