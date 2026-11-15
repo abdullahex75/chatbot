@@ -12,7 +12,7 @@ from typing import Dict, List, Any, Optional
 # ==============================================================================
 APP_TITLE = "MUHAMMAD ABDULLAH SCHOOL AI"
 APP_SUBTITLE = "Next-Generation Smart Learning Platform (Class 1 – Class 10)"
-APP_PASSWORD = "CES Abdullah"  # <--- CONFIGURE LOGIN PASSWORD HERE
+APP_PASSWORD = "Muhammad Abdullah"  # <--- CONFIGURE LOGIN PASSWORD HERE
 
 # JazzCash Guardian-Approved Payment Details
 JAZZCASH_NUMBER = "03483020351"  # <--- APNA JAZZCASH NUMBER YAHAN LIKHEIN
@@ -68,7 +68,7 @@ SUBSCRIPTION_PLANS = {
 # 2. PAGE CONFIGURATION & CUSTOM CSS (CHATGPT-INSPIRED DARK NAVY/PURPLE UI)
 # ==============================================================================
 st.set_page_config(
-    page_title="School Chatbot",
+    page_title=APP_TITLE,
     page_icon="🎓",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -306,7 +306,7 @@ def inject_custom_css():
 
 
 # ==============================================================================
-# 3. PERSISTENT LOCAL STORAGE HELPERS (WINDOWS & CLOUD SAFE)
+# 3. PERSISTENT LOCAL STORAGE HELPERS
 # ==============================================================================
 def load_saved_chats() -> Dict[str, Any]:
     if os.path.exists(DATA_FILE):
@@ -352,229 +352,39 @@ CURRICULUM_KB = {
                 "$$x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}$$\n\n"
                 "**Key Tip:** The expression $\\Delta = b^2 - 4ac$ is called the **discriminant**, which tells us whether the roots are real, equal, or imaginary."
             ),
-            "fraction": (
-                "**Understanding Fractions**\n\n"
-                "A fraction $\\frac{a}{b}$ represents equal parts of a whole, where:\n"
-                "- **$a$ (Numerator):** Number of parts taken.\n"
-                "- **$b$ (Denominator):** Total equal parts ($b \\neq 0$).\n\n"
-                "**Addition Rule:** Make denominators equal using LCM, then add numerators:\n"
-                "$$\\frac{1}{2} + \\frac{1}{3} = \\frac{3}{6} + \\frac{2}{6} = \\frac{5}{6}$$"
-            ),
-            "percentage": (
-                "**Percentage Formula & Applications**\n\n"
-                "Percentage means *per hundred* (%):\n"
-                "$$\\text{Percentage} = \\left(\\frac{\\text{Obtained Value}}{\\text{Total Value}}\\right) \\times 100$$\n\n"
-                "**Example:** If a student scores $425$ out of $500$ marks:\n"
-                "$$\\frac{425}{500} \\times 100 = 85\\%$$"
-            ),
         },
         "overview": "Mathematics builds logical reasoning across Arithmetic, Algebra, Geometry, Trigonometry, and Matrices.",
     },
     "Physics": {
-        "keywords": ["newton", "force", "motion", "velocity", "acceleration", "gravity", "energy", "work", "power", "light", "lens", "mirror", "electricity", "ohm", "current", "voltage", "wave", "sound", "heat", "density", "pressure"],
+        "keywords": ["newton", "force", "motion", "velocity", "acceleration", "gravity", "energy", "work", "power", "light", "lens", "mirror", "electricity", "ohm", "current", "voltage"],
         "concepts": {
             "newton": (
                 "**Newton's Three Laws of Motion**\n\n"
-                "1. **First Law (Law of Inertia):** An object remains at rest or in uniform motion in a straight line unless acted upon by an external net force.\n"
-                "2. **Second Law ($F = ma$):** The acceleration of an object is directly proportional to the net force acting on it and inversely proportional to its mass:\n"
-                "   $$F = m \\times a$$\n"
+                "1. **First Law (Law of Inertia):** An object remains at rest or in uniform motion unless acted upon by an external net force.\n"
+                "2. **Second Law ($F = ma$):** Acceleration is directly proportional to net force and inversely proportional to mass.\n"
                 "3. **Third Law:** To every action, there is always an equal and opposite reaction."
             ),
-            "ohm": (
-                "**Ohm's Law**\n\n"
-                "The electric current ($I$) flowing through a metallic conductor is directly proportional to the potential difference ($V$) across its ends, provided temperature remains constant:\n\n"
-                "$$V = I \\times R$$\n\n"
-                "- **$V$:** Voltage in Volts ($\\text{V}$)\n"
-                "- **$I$:** Current in Amperes ($\\text{A}$)\n"
-                "- **$R$:** Resistance in Ohms ($\\Omega$)"
-            ),
-            "energy": (
-                "**Kinetic & Potential Energy**\n\n"
-                "- **Kinetic Energy ($K.E.$):** Energy due to motion:\n"
-                "  $$K.E. = \\frac{1}{2}mv^2$$\n"
-                "- **Gravitational Potential Energy ($P.E.$):** Energy due to position/height:\n"
-                "  $$P.E. = mgh$$\n"
-                "- **Law of Conservation of Energy:** Energy can neither be created nor destroyed; it only transforms from one form to another."
-            ),
         },
-        "overview": "Physics explains matter, energy, motion, forces, electricity, waves, and the fundamental laws of the universe.",
-    },
-    "Chemistry": {
-        "keywords": ["atom", "molecule", "element", "compound", "periodic", "acid", "base", "salt", "ph", "bond", "ionic", "covalent", "reaction", "mole", "valency", "electron", "proton", "neutron", "solution"],
-        "concepts": {
-            "atom": (
-                "**Structure of an Atom**\n\n"
-                "An atom is the smallest particle of an element that takes part in a chemical reaction. It consists of three fundamental subatomic particles:\n"
-                "- **Proton ($p^+$):** Positively charged, located inside the nucleus.\n"
-                "- **Neutron ($n^0$):** Neutral (no charge), located inside the nucleus.\n"
-                "- **Electron ($e^-$):** Negatively charged, revolves around the nucleus in fixed energy shells ($K, L, M, N$)."
-            ),
-            "acid": (
-                "**Acids, Bases, and the pH Scale**\n\n"
-                "- **Acids:** Release hydrogen ions ($H^+$) in aqueous solution, taste sour, and turn blue litmus red (e.g., $\\text{HCl}, \\text{H}_2\\text{SO}_4$).\n"
-                "- **Bases:** Release hydroxide ions ($OH^-$) in aqueous solution, feel soapy, and turn red litmus blue (e.g., $\\text{NaOH}$).\n"
-                "- **pH Scale ($0 - 14$):** $\\text{pH} < 7$ is acidic, $\\text{pH} = 7$ is neutral (pure water), and $\\text{pH} > 7$ is basic/alkaline."
-            ),
-            "bond": (
-                "**Chemical Bonding (Ionic vs. Covalent)**\n\n"
-                "1. **Ionic Bond:** Formed by complete transfer of electrons from a metal to a non-metal (e.g., $\\text{NaCl}$).\n"
-                "2. **Covalent Bond:** Formed by mutual sharing of electrons between non-metal atoms (e.g., $\\text{H}_2\\text{O}, \\text{CH}_4$)."
-            ),
-        },
-        "overview": "Chemistry explores the composition, structure, properties, and reactions of matter.",
-    },
-    "Biology": {
-        "keywords": ["cell", "mitochondria", "photosynthesis", "respiration", "heart", "blood", "digestive", "nervous", "dna", "gene", "ecosystem", "plant", "animal", "bacteria", "virus", "enzyme", "tissue", "organ"],
-        "concepts": {
-            "cell": (
-                "**The Cell — Basic Unit of Life**\n\n"
-                "Every living organism is made of cells. Key organelles include:\n"
-                "- **Nucleus:** Control center of the cell containing genetic material (DNA).\n"
-                "- **Mitochondria:** Powerhouse of the cell; produces energy in the form of **ATP**.\n"
-                "- **Ribosomes:** Sites of protein synthesis.\n"
-                "- **Chloroplast (Plants only):** Contains chlorophyll for photosynthesis.\n"
-                "- **Cell Wall (Plants only):** Rigid outer layer made of cellulose for structural support."
-            ),
-            "photosynthesis": (
-                "**Photosynthesis in Green Plants**\n\n"
-                "Photosynthesis is the process by which green plants convert light energy into chemical energy (glucose) using carbon dioxide and water:\n\n"
-                "$$6\\text{CO}_2 + 6\\text{H}_2\\text{O} \\xrightarrow{\\text{Sunlight & Chlorophyll}} \\text{C}_6\\text{H}_{12}\\text{O}_6 + 6\\text{O}_2$$\n\n"
-                "- **Reactants:** Carbon dioxide & Water\n"
-                "- **Products:** Glucose & Oxygen"
-            ),
-            "heart": (
-                "**Human Heart & Blood Circulation**\n\n"
-                "The human heart has **four chambers**:\n"
-                "1. **Right Atrium:** Receives deoxygenated blood from the body.\n"
-                "2. **Right Ventricle:** Pumps deoxygenated blood to the lungs for oxygenation.\n"
-                "3. **Left Atrium:** Receives oxygenated blood from the lungs.\n"
-                "4. **Left Ventricle:** Pumps oxygenated blood to the entire body via the **Aorta**."
-            ),
-        },
-        "overview": "Biology studies living organisms, cellular processes, human anatomy, genetics, and ecology.",
-    },
-    "Computer Science": {
-        "keywords": ["computer", "cpu", "ram", "rom", "software", "hardware", "algorithm", "flowchart", "python", "html", "network", "internet", "binary", "data", "database", "loop", "variable", "ai", "operating system"],
-        "concepts": {
-            "cpu": (
-                "**Central Processing Unit (CPU)**\n\n"
-                "The CPU is the brain of the computer that executes instructions. Its three main components are:\n"
-                "1. **ALU (Arithmetic Logic Unit):** Performs mathematical calculations and logical comparisons.\n"
-                "2. **CU (Control Unit):** Directs the flow of data and instructions between memory and I/O devices.\n"
-                "3. **Registers:** Ultra-fast temporary storage locations inside the processor."
-            ),
-            "binary": (
-                "**Binary Number System**\n\n"
-                "Computers process all data in **Binary (Base-2)** using only two digits: `0` and `1` (bits).\n"
-                "- **8 Bits = 1 Byte**\n"
-                "- **1024 Bytes = 1 Kilobyte (KB)**\n"
-                "- **Example Conversion:** Decimal `13` in binary is `1101` ($8 + 4 + 0 + 1 = 13$)."
-            ),
-            "algorithm": (
-                "**Algorithms & Flowcharts**\n\n"
-                "- **Algorithm:** A finite, step-by-step sequence of unambiguous instructions used to solve a specific problem.\n"
-                "- **Flowchart:** A visual diagram representing an algorithm using standard symbols (Oval for Start/Stop, Parallelogram for Input/Output, Rectangle for Processing, Diamond for Decision)."
-            ),
-        },
-        "overview": "Computer Science covers hardware, software, programming logic, algorithms, networks, and problem-solving.",
-    },
-    "English": {
-        "keywords": ["grammar", "tense", "noun", "verb", "adjective", "adverb", "essay", "letter", "application", "active", "passive", "direct", "indirect", "preposition", "pronoun", "story", "summary", "comprehension"],
-        "concepts": {
-            "tense": (
-                "**English Tenses Quick Reference**\n\n"
-                "Tenses show the time of an action (**Present, Past, Future**) across four aspects:\n"
-                "1. **Indefinite (Simple):** *She writes a letter.* / *She wrote a letter.* / *She will write a letter.*\n"
-                "2. **Continuous:** *She is writing.* / *She was writing.* / *She will be writing.*\n"
-                "3. **Perfect:** *She has written.* / *She had written.* / *She will have written.*\n"
-                "4. **Perfect Continuous:** *She has been writing since morning.*"
-            ),
-            "parts of speech": (
-                "**The 8 Parts of Speech**\n\n"
-                "1. **Noun:** Name of a person, place, thing, or idea (*Lahore, book, honesty*).\n"
-                "2. **Pronoun:** Replaces a noun (*he, she, they, it*).\n"
-                "3. **Verb:** Expresses action or state (*run, study, is*).\n"
-                "4. **Adjective:** Describes a noun (*intelligent, blue, tall*).\n"
-                "5. **Adverb:** Modifies a verb, adjective, or adverb (*quickly, very*).\n"
-                "6. **Preposition:** Shows relation (*in, on, under, beside*).\n"
-                "7. **Conjunction:** Joins words or clauses (*and, but, because*).\n"
-                "8. **Interjection:** Expresses sudden emotion (*Hurrah!, Alas!*)."
-            ),
-        },
-        "overview": "English develops reading comprehension, grammar accuracy, creative essay writing, and formal communication.",
-    },
-    "Urdu": {
-        "keywords": ["urdu", "ghazal", "nazm", "ism", "fail", "harf", "mazmoon", "darkhwast", "khat", "tashreeh", "muhawara", "wahid", "jama", "mutazad"],
-        "concepts": {
-            "ism": (
-                "**کلمہ کی اقسام (Parts of Speech in Urdu)**\n\n"
-                "بامعنی لفظ کو **کلمہ** کہتے ہیں، جس کی تین بنیادی اقسام ہیں:\n"
-                "1. **اسم (Noun):** وہ کلمہ جو کسی شخص، جگہ یا چیز کا نام ہو (مثلاً: لاہور، کتاب، عبداللہ)۔\n"
-                "2. **فعل (Verb):** وہ کلمہ جس میں کسی کام کا کرنا یا ہونا زمانے کے ساتھ پایا جائے (مثلاً: پڑھتا ہے، لکھا، جائے گا)۔\n"
-                "3. **حرف (Preposition/Conjunction):** وہ کلمہ جو اکیلا پورا معنی نہ دے بلکہ اسموں اور فعلوں کو آپس میں ملائے (مثلاً: میں، پر، سے، اور)۔"
-            ),
-        },
-        "overview": "Urdu literature and grammar strengthen expression, poetry appreciation (نظم و غزل), and formal writing.",
-    },
-    "Islamic Studies": {
-        "keywords": ["islam", "quran", "hadith", "pillar", "arkan", "namaz", "salah", "zakat", "roza", "fasting", "hajj", "tauheed", "prophet", "seerah", "caliph", "khulafa"],
-        "concepts": {
-            "pillar": (
-                "**Five Pillars of Islam (ارکانِ اسلام)**\n\n"
-                "1. **Shahadah (توحید و رسالت):** Declaring that there is no god worthy of worship except Allah, and Muhammad (ﷺ) is His final Messenger.\n"
-                "2. **Salah (نماز):** Offering the five obligatory daily prayers.\n"
-                "3. **Zakat (زکوٰۃ):** Giving 2.5% of eligible annual savings to the poor and needy.\n"
-                "4. **Sawm (روزہ):** Fasting during the blessed month of Ramadan from dawn until sunset.\n"
-                "5. **Hajj (حج):** Pilgrimage to Makkah at least once in a lifetime for those physically and financially able."
-            ),
-        },
-        "overview": "Islamic Studies teaches Quranic guidance, Hadith, Seerah of the Holy Prophet (ﷺ), and Islamic ethics.",
-    },
-    "Pakistan Studies": {
-        "keywords": ["pakistan", "quaid", "iqbal", "1947", "1940", "resolution", "ideology", "indus", "river", "province", "constitution", "1973", "mountain", "k2", "karakoram", "sir syed"],
-        "concepts": {
-            "resolution": (
-                "**Lahore Resolution (Pakistan Resolution — 23 March 1940)**\n\n"
-                "- **Date & Venue:** Passed on **23rd March 1940** at Minto Park (now Iqbal Park), Lahore, during the annual session of the All-India Muslim League.\n"
-                "- **Presided by:** Quaid-e-Azam Muhammad Ali Jinnah.\n"
-                "- **Moved by:** Sher-e-Bengal A.K. Fazlul Huq.\n"
-                "- **Significance:** It formally demanded independent states for the Muslims of Northwestern and Eastern zones of India, laying the foundation for the creation of Pakistan on **14 August 1947**."
-            ),
-            "constitution": (
-                "**Constitution of Pakistan (1973)**\n\n"
-                "- Enacted on **14 August 1973**.\n"
-                "- Established a **Federal Parliamentary System** of government.\n"
-                "- Declared **Islam** as the State Religion and named the country the **Islamic Republic of Pakistan**.\n"
-                "- Bicameral legislature (**Majlis-e-Shoora**) consisting of the National Assembly and the Senate."
-            ),
-        },
-        "overview": "Pakistan Studies covers the Pakistan Movement, Ideology, Geography, Climate, Resources, and Constitutional History.",
+        "overview": "Physics explains matter, energy, motion, forces, electricity, and the fundamental laws of the universe.",
     },
     "General Knowledge": {
-        "keywords": ["capital", "planet", "solar", "continent", "ocean", "currency", "invention", "science", "world", "earth", "sun", "moon", "quiz", "fact"],
+        "keywords": ["capital", "planet", "solar", "continent", "ocean", "currency", "invention", "science", "world", "earth"],
         "concepts": {
             "solar": (
                 "**Our Solar System**\n\n"
-                "The Solar System consists of the Sun and **8 planets** orbiting around it in order from closest to farthest:\n"
-                "1. **Mercury** (Smallest & closest to the Sun)\n"
-                "2. **Venus** (Hottest planet)\n"
-                "3. **Earth** (Our home planet with liquid water & life)\n"
-                "4. **Mars** (The Red Planet)\n"
-                "5. **Jupiter** (Largest planet)\n"
-                "6. **Saturn** (Famous for its prominent ring system)\n"
-                "7. **Uranus** (Ice giant tilted on its side)\n"
-                "8. **Neptune** (Farthest planet with supersonic winds)"
+                "The Solar System consists of the Sun and **8 planets** orbiting around it:\n"
+                "Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, and Neptune."
             ),
         },
-        "overview": "General Knowledge expands curiosity across world geography, space, inventions, current awareness, and everyday science.",
+        "overview": "General Knowledge expands curiosity across world geography, space, inventions, and everyday science.",
     },
 }
 
 
 def check_conversational_intent(prompt: str, selected_class: str, selected_subject: str) -> Optional[str]:
     """
-    Handles starting greetings (Hello, Hi, Assalam-o-Alaikum, Kya hal hai, Kaisi ho)
-    and ending farewells (Bye, Allah Hafiz, Shukriya, Thank you) naturally.
+    Handles professional, polite conversational greetings (Assalam-o-Alaikum, Walaikum-o-Salam,
+    Hello, Hi, Kya hal hai, Kaisi ho, etc.) and farewells naturally.
     """
     clean = re.sub(r"[^\w\s]", "", prompt.lower()).strip()
     words = clean.split()
@@ -598,26 +408,25 @@ def check_conversational_intent(prompt: str, selected_class: str, selected_subje
         "shukriya", "thank you", "thanks", "thx", "bohat shukriya", "jazakallah",
     ]
 
-    # 1. Check Farewell / Ending Messages
+    # 1. Farewell / Gratitude Handler
     if any(phrase in clean for phrase in farewell_triggers) and len(words) <= 6:
         if any(t in clean for t in ["shukriya", "thank", "thx", "jazakallah"]):
             return (
                 f"You're very welcome, **{student_name}**! 😊✨\n\n"
-                f"Mujhe aapki madad karke bohat khushi hui. Agar **{selected_subject}** ({selected_class}) ya kisi aur subject mein koi aur sawal ho to zaroor poochein.\n\n"
+                f"Aapki parhai mein madad karke mujhe bohat khushi hui. Agar **{selected_subject}** ({selected_class}) ya kisi aur topic mein koi aur sawal ho to zaroor poochein.\n\n"
                 f"**Allah Hafiz & Best of Luck with your studies!** 🎓📚"
             )
         return (
             f"**Allah Hafiz, {student_name}!** 👋🌟\n\n"
-            f"Apna bohat khayal rakhiyega aur dil laga kar parhai kijiyega. Jab bhi aapko **{selected_class}** ke kisi bhi subject mein madad chahiye ho, main yahan hazir hoon.\n\n"
-            f"**See you in our next study session!** 🎓"
+            f"Apna bohat khayal rakhiyega aur dil laga kar parhai kijiyega. Jab bhi aapko **{selected_class}** ke kisi bhi subject mein madad chahiye ho, main yahan hazir hoon."
         )
 
-    # 2. Check Starting Greetings + "Kya hal hai / Kaisi ho"
+    # 2. Greeting + Wellbeing Handler (Assalam-o-Alaikum -> Walaikum-o-Salam)
     has_greeting = (clean in greeting_triggers) or any(w in greeting_triggers for w in words[:3])
     has_wellbeing = any(phrase in clean for phrase in wellbeing_triggers)
 
     if (has_greeting or has_wellbeing) and len(words) <= 8:
-        if has_wellbeing:
+        if has_wellbeing or "salam" in clean or "assalam" in clean or "aoa" in clean:
             return (
                 f"**Wa Alaikum Assalam & Hello {student_name}!** 👋😊\n\n"
                 f"Alhamdulillah, main bilkul theek aur tayyar hoon aapki parhai mein madad karne ke liye! Aap sunayein, aap kaise hain?\n\n"
@@ -633,7 +442,6 @@ def check_conversational_intent(prompt: str, selected_class: str, selected_subje
 
 
 def try_evaluate_math_expression(prompt: str) -> Optional[str]:
-    """Safely evaluates straightforward arithmetic queries like 'solve 25 * 4 + 10'."""
     cleaned = prompt.lower().replace("what is", "").replace("calculate", "").replace("solve", "").replace("=", "").replace("?", "").strip()
     if re.fullmatch(r"[0-9\+\-\*\/\(\)\.\s\^]+", cleaned) and any(op in cleaned for op in ["+", "-", "*", "/", "^"]):
         expr = cleaned.replace("^", "**")
@@ -644,7 +452,7 @@ def try_evaluate_math_expression(prompt: str) -> Optional[str]:
                 return (
                     f"**Step-by-Step Arithmetic Solution**\n\n"
                     f"- **Expression:** `{cleaned}`\n"
-                    f"- **Order of Operations (BODMAS / PEMDAS):** Brackets $\\rightarrow$ Orders $\\rightarrow$ Division/Multiplication $\\rightarrow$ Addition/Subtraction\n"
+                    f"- **Order of Operations:** Brackets $\\rightarrow$ Orders $\\rightarrow$ Division/Multiplication $\\rightarrow$ Addition/Subtraction\n"
                     f"- **Final Answer:** **{formatted_res}**"
                 )
         except Exception:
@@ -665,16 +473,14 @@ def get_grade_pedagogy_note(selected_class: str) -> str:
 
 
 def generate_educational_response(user_prompt: str, selected_class: str, selected_subject: str) -> str:
-    # 0. Check for starting greetings ("Hello", "Hi", "Kya hal hai", "Kaisi ho") or ending ("Bye", "Allah Hafiz", "Thanks")
-    conversational_reply = check_conversational_intent(user_prompt, selected_class, selected_subject)
-    if conversational_reply:
-        return conversational_reply
+    conv_reply = check_conversational_intent(user_prompt, selected_class, selected_subject)
+    if conv_reply:
+        return conv_reply
 
     prompt_lower = user_prompt.strip().lower()
     grade_level_label = get_grade_pedagogy_note(selected_class)
     subject_icon = SUBJECTS.get(selected_subject, "📚")
 
-    # 1. Check direct arithmetic expressions
     if selected_subject in ["Mathematics", "Physics", "General Knowledge"]:
         math_solution = try_evaluate_math_expression(user_prompt)
         if math_solution:
@@ -685,7 +491,6 @@ def generate_educational_response(user_prompt: str, selected_class: str, selecte
                 f"💡 **Study Tip:** Always double-check signs and brackets when solving multi-step problems."
             )
 
-    # 2. Search selected subject's curriculum knowledge base
     subject_data = CURRICULUM_KB.get(selected_subject, CURRICULUM_KB["General Knowledge"])
     matched_concept = None
 
@@ -694,7 +499,6 @@ def generate_educational_response(user_prompt: str, selected_class: str, selecte
             matched_concept = explanation
             break
 
-    # 3. Cross-check all subjects if user asked a specific topic under a broader subject
     if not matched_concept:
         for subj_name, subj_info in CURRICULUM_KB.items():
             for key, explanation in subj_info["concepts"].items():
@@ -713,7 +517,6 @@ def generate_educational_response(user_prompt: str, selected_class: str, selecte
             f"**Want to practice?** Ask me for *practice questions*, *MCQs*, or a *simpler explanation* for **{selected_class}**!"
         )
 
-    # 4. Structured Academic Tutor Response for any custom topic/question
     grade_num = int(selected_class.split()[-1])
     if grade_num <= 5:
         explanation_body = (
@@ -722,20 +525,15 @@ def generate_educational_response(user_prompt: str, selected_class: str, selecte
             f"#### 2. Key Points to Remember\n"
             f"- **Core Idea:** Focus on the main definition and real-world examples first.\n"
             f"- **Observation:** Look for patterns, keywords, and rules connected to this topic in your textbook.\n"
-            f"- **Practice:** Write down 3 short sentences or solve 2 basic examples in your notebook.\n\n"
-            f"#### 3. Quick Check Question\n"
-            f"Can you tell me one example of **{user_prompt}** from your daily life or textbook?"
+            f"- **Practice:** Write down 3 short sentences or solve 2 basic examples in your notebook."
         )
     else:
         explanation_body = (
             f"#### 1. Concept Overview\n"
             f"Within **{selected_subject}** ({selected_class} curriculum), **\"{user_prompt}\"** requires understanding both theoretical definitions and practical applications.\n\n"
             f"#### 2. Structured Study Breakdown\n"
-            f"- **Definition & Scope:** Identify the core principle, formula, or historical/scientific rule governing this topic.\n"
-            f"- **Key Mechanism / Reasoning:** Break the problem into *Given Data / Premise*, *Core Rule*, and *Conclusion*.\n"
-            f"- **Board Exam Approach:** Present answers with clear headings, labeled diagrams/equations where applicable, and concise bullet points.\n\n"
-            f"#### 3. Recommended Next Step\n"
-            f"Share the exact textbook question, numerical values, or paragraph you are studying, and I will walk you through the complete step-by-step solution."
+            f"- **Definition & Scope:** Identify the core principle, formula, or scientific rule governing this topic.\n"
+            f"- **Board Exam Approach:** Present answers with clear headings, labeled diagrams/equations where applicable, and concise bullet points."
         )
 
     return (
@@ -754,7 +552,7 @@ def init_session_state():
         st.session_state.authenticated = False
 
     if "student_name" not in st.session_state:
-        st.session_state.student_name = "Abdullah Student"
+        st.session_state.student_name = "Muhammad Abdullah"
 
     if "selected_class" not in st.session_state:
         st.session_state.selected_class = "Class 9"
@@ -831,10 +629,10 @@ def delete_chat(chat_id: str):
 
 
 # ==============================================================================
-# 6. LOGIN SCREEN (PASSWORD-ONLY WITH VISIBILITY TOGGLE)
+# 6. LOGIN SCREEN
 # ==============================================================================
 def render_login_page():
-    col_left, col_center, col_right = st.columns([1, 1.35, 1])
+    _, col_center, _ = st.columns([1, 1.35, 1])
     with col_center:
         st.markdown(
             f"""
@@ -868,7 +666,7 @@ def render_login_page():
             )
 
             student_display_name = st.text_input(
-                "Student Name (Optional)",
+                "Student Name",
                 value=st.session_state.student_name,
                 placeholder="e.g., Muhammad Abdullah",
                 key="login_student_name_input",
@@ -887,18 +685,9 @@ def render_login_page():
                 else:
                     st.error("❌ Incorrect password. Please check your access password and try again.")
 
-        st.markdown(
-            f"""
-            <div class="custom-footer">
-                © {datetime.datetime.now().year} {APP_TITLE} • Secure Student Portal
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
 
 # ==============================================================================
-# 7. SIDEBAR (CHATGPT-STYLE NAVIGATION, SEARCH, HISTORY, CLASS/SUBJECT, USAGE)
+# 7. SIDEBAR NAVIGATION
 # ==============================================================================
 def render_sidebar():
     with st.sidebar:
@@ -929,7 +718,7 @@ def render_sidebar():
             st.session_state.search_query = st.text_input(
                 "Search conversations",
                 value=st.session_state.search_query,
-                placeholder="Filter by title, subject, or message...",
+                placeholder="Filter chats...",
                 label_visibility="collapsed",
                 key="sb_search_input",
             )
@@ -979,16 +768,10 @@ def render_sidebar():
         query = st.session_state.search_query.strip().lower()
         chat_items = list(reversed(list(st.session_state.chats.values())))
 
-        if query:
-            filtered_chats = []
-            for c in chat_items:
-                in_title = query in c.get("title", "").lower()
-                in_subj = query in c.get("subject", "").lower()
-                in_msgs = any(query in m.get("content", "").lower() for m in c.get("messages", []))
-                if in_title or in_subj or in_msgs:
-                    filtered_chats.append(c)
-        else:
-            filtered_chats = chat_items
+        filtered_chats = [
+            c for c in chat_items
+            if not query or query in c.get("title", "").lower() or query in c.get("subject", "").lower()
+        ]
 
         if not filtered_chats:
             st.caption("No matching conversations found.")
@@ -1003,455 +786,7 @@ def render_sidebar():
 
                 c_open, c_del = st.columns([4.3, 1])
                 with c_open:
-                    if st.button(label, key=f"open_chat_{cid}", use_container_width=True, help=f"{raw_title} ({chat.get('class')} • {chat.get('subject')})"):
+                    if st.button(label, key=f"open_chat_{cid}", use_container_width=True):
                         st.session_state.current_chat_id = cid
                         st.session_state.selected_class = chat.get("class", st.session_state.selected_class)
-                        st.session_state.selected_subject = chat.get("subject", st.session_state.selected_subject)
-                        st.session_state.active_view = "chat"
-                        st.rerun()
-                with c_del:
-                    if st.button("🗑️", key=f"del_chat_{cid}", use_container_width=True, help="Delete chat"):
-                        delete_chat(cid)
-                        st.rerun()
-
-        st.markdown("---")
-
-        st.markdown("##### ⚡ Account Usage")
-        remaining = max(0, FREE_MESSAGE_LIMIT - st.session_state.messages_used)
-        progress_val = min(1.0, st.session_state.messages_used / FREE_MESSAGE_LIMIT)
-
-        if st.session_state.is_premium:
-            st.markdown(
-                f"""
-                <div class="sidebar-card">
-                    <div style="font-size: 0.82rem; font-weight: 700; color: #6ee7b7;">👑 Premium Active</div>
-                    <div style="font-size: 0.75rem; color: #cbd5e1; margin-top: 2px;">Plan: {st.session_state.subscription_plan_name}</div>
-                    <div style="font-size: 0.72rem; color: #94a3b8;">Expires: {st.session_state.subscription_expiry}</div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-        else:
-            st.markdown(
-                f"""
-                <div class="sidebar-card">
-                    <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:4px;">
-                        <span style="color:#cbd5e1; font-weight:600;">Free Plan</span>
-                        <span style="color:#c084fc; font-weight:700;">{remaining} / {FREE_MESSAGE_LIMIT} left</span>
-                    </div>
-                    <div style="font-size:0.72rem; color:#94a3b8;">
-                        Used {st.session_state.messages_used} of {FREE_MESSAGE_LIMIT} free messages
-                    </div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-            st.progress(progress_val)
-
-        if st.button("🎁 Claim Offer / Upgrade", use_container_width=True, type="primary", key="sb_claim_offer_btn"):
-            st.session_state.active_view = "subscription"
-            st.rerun()
-
-        st.markdown("---")
-
-        st.markdown(
-            f"""
-            <div class="sidebar-card" style="display:flex; align-items:center; gap:10px;">
-                <div style="width:36px; height:36px; border-radius:50%; background:linear-gradient(135deg,#7c3aed,#2563eb);
-                            display:flex; align-items:center; justify-content:center; font-weight:700; color:white;">
-                    {st.session_state.student_name[0].upper()}
-                </div>
-                <div>
-                    <div style="font-size:0.85rem; font-weight:700; color:#f8fafc;">{st.session_state.student_name}</div>
-                    <div style="font-size:0.72rem; color:#94a3b8;">{st.session_state.selected_class} • Verified Student</div>
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        if st.button("🚪 Logout", use_container_width=True, key="sb_logout_btn"):
-            st.session_state.authenticated = False
-            st.rerun()
-
-
-# ==============================================================================
-# 8. JAZZCASH PAYMENT SECTION & PREMIUM SUBSCRIPTION VIEW
-# ==============================================================================
-def render_payment_section():
-    st.markdown("---")
-    st.markdown("## 💳 JazzCash Payment")
-
-    st.info(
-        "Choose your plan and contact the administrator "
-        "for manual payment verification."
-    )
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.markdown("### Weekly Plan")
-        st.subheader("PKR 200")
-        st.caption("7 Days Access")
-
-    with col2:
-        st.markdown("### Monthly Plan")
-        st.subheader("PKR 500")
-        st.caption("30 Days Access")
-
-    st.divider()
-
-    st.markdown("### 📱 Payment Details")
-
-    # Replace these placeholders only with guardian-approved details.
-    payment_number = JAZZCASH_NUMBER
-    account_name = JAZZCASH_ACCOUNT_NAME
-
-    st.write("**JazzCash Number:**", payment_number)
-    st.write("**Account Name:**", account_name)
-
-    st.warning(
-        "Payment ke baad administrator se contact karein. "
-        "Premium access sirf payment verify hone ke baad activate hoga."
-    )
-
-    st.caption(
-        "Automatic payment gateway abhi connected nahi hai. "
-        "Is app mein payment automatically process nahi hoti."
-    )
-
-
-def render_subscription_page(limit_reached: bool = False):
-    if limit_reached:
-        st.markdown(
-            """
-            <div class="welcome-card" style="border-color: rgba(244, 63, 94, 0.55); text-align: center;">
-                <div style="font-size: 2.6rem; margin-bottom: 8px;">⏳</div>
-                <h2 style="color: #fda4af; font-weight: 800; margin-bottom: 6px;">
-                    You've reached your free usage limit.
-                </h2>
-                <p style="color: #cbd5e1; max-width: 620px; margin: 0 auto 14px auto; font-size: 0.96rem;">
-                    You have used all <strong>10 free AI tutor messages</strong>. Claim our student offer below to unlock uninterrupted study assistance across all 10 subjects for Class 1 to Class 10.
-                </p>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-    else:
-        st.markdown(
-            """
-            <div class="welcome-card" style="text-align: center;">
-                <span class="popular-ribbon">🎁 Student Special Offer</span>
-                <h2 class="welcome-title">Upgrade to Muhammad Abdullah School AI Pro</h2>
-                <p style="color: #cbd5e1; max-width: 640px; margin: 0 auto; font-size: 0.95rem;">
-                    Choose a flexible study pass tailored for school exams, daily homework help, and board preparation.
-                </p>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-    status_col1, status_col2, status_col3 = st.columns(3)
-    with status_col1:
-        st.metric("Account Status", "Premium" if st.session_state.is_premium else "Free Tier")
-    with status_col2:
-        st.metric("Payment Status", "Verified" if st.session_state.is_premium else "Manual Verification Required")
-    with status_col3:
-        st.metric(
-            "Subscription Expiry",
-            st.session_state.subscription_expiry if st.session_state.subscription_expiry else "N/A (Free Limit: 10 Msgs)",
-        )
-
-    st.markdown("### 💎 Available Subscription Plans")
-    col_weekly, col_monthly = st.columns(2, gap="large")
-
-    with col_weekly:
-        plan_w = SUBSCRIPTION_PLANS["weekly"]
-        features_w_html = "".join([f"<li style='margin-bottom:8px; color:#cbd5e1;'>✅ {f}</li>" for f in plan_w["features"]])
-        st.markdown(
-            f"""
-            <div class="pricing-card">
-                <div style="font-size:0.8rem; color:#94a3b8; font-weight:700; text-transform:uppercase;">Starter Pass</div>
-                <h3 style="margin:6px 0 0 0; color:#f8fafc; font-weight:700;">{plan_w['name']}</h3>
-                <div class="price-tag">{plan_w['price']}</div>
-                <div class="price-duration">🗓️ {plan_w['duration']}</div>
-                <ul style="list-style:none; padding-left:0; margin-top:16px; font-size:0.9rem;">
-                    {features_w_html}
-                </ul>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-        if st.button("Choose Weekly Plan (PKR 200)", use_container_width=True, key="choose_weekly_plan_btn"):
-            st.session_state.pending_plan_choice = "Weekly Plan — PKR 200 (7 Days Access)"
-
-    with col_monthly:
-        plan_m = SUBSCRIPTION_PLANS["monthly"]
-        features_m_html = "".join([f"<li style='margin-bottom:8px; color:#e2e8f0;'>✅ {f}</li>" for f in plan_m["features"]])
-        st.markdown(
-            f"""
-            <div class="pricing-card-popular">
-                <span class="popular-ribbon">⭐ Popular Plan</span>
-                <h3 style="margin:4px 0 0 0; color:#ffffff; font-weight:800;">{plan_m['name']}</h3>
-                <div class="price-tag">{plan_m['price']}</div>
-                <div class="price-duration">🗓️ {plan_m['duration']} • Best Value</div>
-                <ul style="list-style:none; padding-left:0; margin-top:16px; font-size:0.9rem;">
-                    {features_m_html}
-                </ul>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-        if st.button("Choose Monthly Plan (PKR 500)", type="primary", use_container_width=True, key="choose_monthly_plan_btn"):
-            st.session_state.pending_plan_choice = "Monthly Plan — PKR 500 (30 Days Access)"
-
-    if st.session_state.pending_plan_choice:
-        st.success(f"✅ **Selected Plan:** {st.session_state.pending_plan_choice} — Neeche diye gaye JazzCash details par payment bhej kar administrator se verify karwayein.")
-
-    # Merged JazzCash Payment Section
-    render_payment_section()
-
-    st.markdown("<br>", unsafe_allow_html=True)
-    if not limit_reached:
-        if st.button("⬅️ Back to Study Chat", key="back_to_chat_from_sub_btn"):
-            st.session_state.active_view = "chat"
-            st.rerun()
-
-
-# ==============================================================================
-# 9. STUDENT DASHBOARD VIEW
-# ==============================================================================
-def render_student_dashboard():
-    st.markdown(
-        f"""
-        <div class="welcome-card">
-            <h2 class="welcome-title">📊 Student Learning Dashboard</h2>
-            <p style="color:#cbd5e1; margin:0;">
-                Welcome back, <strong>{st.session_state.student_name}</strong>! Track your study sessions, active grade level, and account status.
-            </p>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    total_chats = len(st.session_state.chats)
-    total_messages = sum(len(c.get("messages", [])) for c in st.session_state.chats.values())
-    remaining = max(0, FREE_MESSAGE_LIMIT - st.session_state.messages_used)
-
-    m1, m2, m3, m4 = st.columns(4)
-    with m1:
-        st.metric("Active Class", st.session_state.selected_class)
-    with m2:
-        st.metric("Saved Study Chats", total_chats)
-    with m3:
-        st.metric("Total Messages Exchanged", total_messages)
-    with m4:
-        st.metric("Free Messages Remaining", "Unlimited" if st.session_state.is_premium else f"{remaining} / {FREE_MESSAGE_LIMIT}")
-
-    st.markdown("### 📚 Curriculum Subjects Overview")
-    cols = st.columns(5)
-    for idx, (subj, icon) in enumerate(SUBJECTS.items()):
-        with cols[idx % 5]:
-            st.markdown(
-                f"""
-                <div class="sidebar-card" style="text-align:center; padding:16px 10px;">
-                    <div style="font-size:1.7rem;">{icon}</div>
-                    <div style="font-size:0.85rem; font-weight:700; color:#f1f5f9; margin-top:6px;">{subj}</div>
-                    <div style="font-size:0.72rem; color:#94a3b8;">Class 1 – 10</div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-
-    if st.button("💬 Return to AI Tutor Chat", type="primary", key="dash_return_chat_btn"):
-        st.session_state.active_view = "chat"
-        st.rerun()
-
-
-# ==============================================================================
-# 10. MAIN CHATBOT INTERFACE
-# ==============================================================================
-def render_chat_interface():
-    if (not st.session_state.is_premium) and (st.session_state.messages_used >= FREE_MESSAGE_LIMIT):
-        render_subscription_page(limit_reached=True)
-        return
-
-    current_chat = st.session_state.chats.get(st.session_state.current_chat_id)
-    if not current_chat:
-        create_new_chat(switch=True)
-        current_chat = st.session_state.chats[st.session_state.current_chat_id]
-
-    subj_icon = SUBJECTS.get(st.session_state.selected_subject, "📚")
-    remaining = max(0, FREE_MESSAGE_LIMIT - st.session_state.messages_used)
-
-    top_col1, top_col2 = st.columns([3.5, 1.2])
-    with top_col1:
-        st.markdown(
-            f"""
-            <div class="context-banner">
-                <div>
-                    <span class="badge-pill badge-class">🎓 {st.session_state.selected_class}</span>
-                    <span class="badge-pill badge-subject">{subj_icon} {st.session_state.selected_subject}</span>
-                    <span class="badge-pill badge-status">● AI Tutor Online</span>
-                </div>
-                <div style="font-size:0.8rem; color:#94a3b8;">
-                    Free Credits Left: <strong style="color:#c084fc;">{remaining}/{FREE_MESSAGE_LIMIT}</strong>
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-    with top_col2:
-        act_c1, act_c2 = st.columns(2)
-        with act_c1:
-            if st.button("🧹 Clear", use_container_width=True, help="Clear current conversation", key="clear_current_chat_btn"):
-                current_chat["messages"] = []
-                current_chat["title"] = "New Study Session"
-                save_chats_to_disk(st.session_state.chats)
-                st.rerun()
-        with act_c2:
-            if st.button("➕ New", use_container_width=True, help="Start fresh chat", key="top_new_chat_btn"):
-                create_new_chat(switch=True)
-                st.rerun()
-
-    if not current_chat["messages"]:
-        st.markdown(
-            f"""
-            <div class="welcome-card">
-                <div class="welcome-title">Assalam-o-Alaikum, {st.session_state.student_name}! 👋</div>
-                <p style="color:#cbd5e1; font-size:0.98rem; line-height:1.6; margin-bottom:16px;">
-                    Welcome to <strong>{APP_TITLE}</strong>. You are currently studying
-                    <strong>{subj_icon} {st.session_state.selected_subject}</strong> for <strong>{st.session_state.selected_class}</strong>.
-                    Say <em>"Hello, kya hal hai?"</em> or ask any concept, homework problem, or exam question below!
-                </p>
-                <div style="font-size:0.82rem; color:#93c5fd; font-weight:600;">
-                    ✨ Try a quick starter prompt below or type your own question at the bottom:
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        starter_prompts = {
-            "Mathematics": ["Hello! Kya hal hai?", "Explain Pythagoras Theorem with example", "Solve 25 * 4 + 18"],
-            "Physics": ["Hi! Kaisi ho?", "State Newton's Three Laws of Motion", "Explain Ohm's Law (V = IR)"],
-            "Chemistry": ["Hello! Kya hal hai?", "Describe the structure of an atom", "Explain Acids, Bases, and pH scale"],
-            "Biology": ["Hi! Kaisi ho?", "Explain the structure of a Cell", "Write the equation of Photosynthesis"],
-            "Computer Science": ["Hello! Kya hal hai?", "What are the main parts of a CPU?", "Explain Binary Number System"],
-            "English": ["Hello! How are you?", "Explain the 8 Parts of Speech", "Give a quick guide to English Tenses"],
-            "Urdu": ["السلام علیکم! کیا حال ہے؟", "کلمہ کی اقسام بیان کریں (اسم، فعل، حرف)", "مضمون نویسی کے اہم اصول کیا ہیں؟"],
-            "Islamic Studies": ["Assalam-o-Alaikum! Kya hal hai?", "Explain the Five Pillars of Islam", "What is the significance of Zakat?"],
-            "Pakistan Studies": ["Hello! Kya hal hai?", "Explain the Lahore Resolution 1940", "Key features of the 1973 Constitution"],
-            "General Knowledge": ["Hi! Kaisi ho?", "List all 8 planets of our Solar System", "Important scientific inventions"],
-        }
-        suggestions = starter_prompts.get(st.session_state.selected_subject, starter_prompts["General Knowledge"])
-
-        s_cols = st.columns(3)
-        for i, suggestion in enumerate(suggestions):
-            with s_cols[i]:
-                if st.button(f"💡 {suggestion}", use_container_width=True, key=f"starter_prompt_{i}"):
-                    process_user_message(suggestion, current_chat)
-                    st.rerun()
-
-    for idx, msg in enumerate(current_chat["messages"]):
-        role = msg["role"]
-        avatar = "🧑‍🎓" if role == "user" else "🤖"
-        with st.chat_message(role, avatar=avatar):
-            st.markdown(msg["content"])
-            if role == "assistant":
-                c_time, c_copy = st.columns([4, 1])
-                with c_time:
-                    st.caption(f"🕒 {msg.get('timestamp', '')} • {msg.get('class', st.session_state.selected_class)} • {msg.get('subject', st.session_state.selected_subject)}")
-                with c_copy:
-                    if st.button("📋 Copy", key=f"copy_btn_{current_chat['id']}_{idx}", use_container_width=True):
-                        st.session_state.copied_msg_id = f"{current_chat['id']}_{idx}"
-
-                if st.session_state.copied_msg_id == f"{current_chat['id']}_{idx}":
-                    st.code(msg["content"], language="markdown")
-
-    user_input = st.chat_input(
-        f"Say Hello or Ask {APP_TITLE} ({st.session_state.selected_class} • {st.session_state.selected_subject})..."
-    )
-
-    if user_input and user_input.strip():
-        process_user_message(user_input.strip(), current_chat)
-        st.rerun()
-
-
-def process_user_message(prompt_text: str, current_chat: Dict[str, Any]):
-    if (not st.session_state.is_premium) and (st.session_state.messages_used >= FREE_MESSAGE_LIMIT):
-        st.session_state.active_view = "subscription"
-        return
-
-    now_str = datetime.datetime.now().strftime("%I:%M %p")
-
-    if not current_chat["messages"]:
-        clean_title = prompt_text[:38] + ("..." if len(prompt_text) > 38 else "")
-        current_chat["title"] = clean_title
-
-    current_chat["messages"].append(
-        {
-            "role": "user",
-            "content": prompt_text,
-            "timestamp": now_str,
-            "class": st.session_state.selected_class,
-            "subject": st.session_state.selected_subject,
-        }
-    )
-
-    with st.spinner("🤖 Thinking & preparing your reply..."):
-        time.sleep(0.35)
-        ai_reply = generate_educational_response(
-            user_prompt=prompt_text,
-            selected_class=st.session_state.selected_class,
-            selected_subject=st.session_state.selected_subject,
-        )
-
-    current_chat["messages"].append(
-        {
-            "role": "assistant",
-            "content": ai_reply,
-            "timestamp": now_str,
-            "class": st.session_state.selected_class,
-            "subject": st.session_state.selected_subject,
-        }
-    )
-
-    current_chat["updated_at"] = datetime.datetime.now().strftime("%d %b %Y, %I:%M %p")
-    st.session_state.messages_used += 1
-    save_chats_to_disk(st.session_state.chats)
-
-
-# ==============================================================================
-# 11. MAIN ENTRY POINT
-# ==============================================================================
-def main():
-    inject_custom_css()
-    init_session_state()
-
-    if not st.session_state.authenticated:
-        render_login_page()
-        return
-
-    render_sidebar()
-
-    if st.session_state.active_view == "subscription":
-        limit_reached = (not st.session_state.is_premium) and (st.session_state.messages_used >= FREE_MESSAGE_LIMIT)
-        render_subscription_page(limit_reached=limit_reached)
-    elif st.session_state.active_view == "dashboard":
-        render_student_dashboard()
-    else:
-        render_chat_interface()
-
-    st.markdown(
-        f"""
-        <div class="custom-footer">
-            <strong>{APP_TITLE}</strong> • Empowering Students from Class 1 to Class 10 across All Core Subjects • Built with Streamlit
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-
-if __name__ == "__main__":
-    main()
+                        st.session_state.selected_subject =
