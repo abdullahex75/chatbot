@@ -1,91 +1,114 @@
+"""
+Muhammad Abdullah School AI
+---------------------------
+A Streamlit learning assistant for Class 1-10 students.
+
+Features: password login, offline knowledge-base chatbot (English / Urdu /
+Roman Urdu), optional Claude AI for unknown questions, calculator, notes,
+quiz and study planner.
+
+Run:  streamlit run app.py
+"""
+
+from __future__ import annotations
+
+import ast
+import difflib
+import hmac
+import html
+import json
+import operator
+import os
+import random
+import re
+import uuid
+from datetime import date, datetime
+from pathlib import Path
 
 import streamlit as st
-import json
-import os
-import ast
-import operator
-import random
-from datetime import datetime, date
+
+try:  # Optional: only needed for AI mode
+    import anthropic
+except ImportError:  # pragma: no cover
+    anthropic = None
 
 # ==================================================
 # 1. APP CONFIGURATION
 # ==================================================
 
 st.set_page_config(
-    page_title="Muhammad Abdullah",
+    page_title="School AI",
     page_icon="🎓",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
 )
 
-APP_NAME = "School AI chatbot"
-APP_PASSWORD = "CES Abdullah"
+APP_NAME = "Muhammad Abdullah School AI"
+MAX_LOGIN_ATTEMPTS = 5
 
-NOTES_FILE = "school_ai_notes.json"
-PLANNER_FILE = "school_ai_planner.json"
+DATA_DIR = Path(os.getenv("SCHOOL_AI_DATA_DIR", "data"))
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+NOTES_FILE = DATA_DIR / "school_ai_notes.json"
+PLANNER_FILE = DATA_DIR / "school_ai_planner.json"
 
 CLASSES = [f"Class {i}" for i in range(1, 11)]
-
 SUBJECTS = [
-    "Mathematics",
-    "English",
-    "Urdu",
-    "Physics",
-    "Chemistry",
-    "Biology",
-    "Computer Science",
-    "General Science",
-    "Islamiat",
-    "Pakistan Studies",
-    "History",
-    "Geography",
-    "General Knowledge",
-    "Other"
+    "Mathematics", "English", "Urdu", "Physics", "Chemistry", "Biology",
+    "Computer Science", "General Science", "Islamiat", "Pakistan Studies",
+    "History", "Geography", "General Knowledge", "Other",
 ]
+LANGUAGES = ["Simple English", "Urdu", "Roman Urdu"]
+
+
+def get_secret(name: str, default: str | None = None) -> str | None:
+    """Read a value from Streamlit secrets, then environment variables."""
+    try:
+        if name in st.secrets:
+            return str(st.secrets[name])
+    except Exception:
+        pass
+    return os.getenv(name, default)
+
+
+AI_MODEL = get_secret("CHATBOT_MODEL", "claude-sonnet-5-5")
+
+
+def ai_available() -> bool:
+    return anthropic is not None and bool(get_secret("ANTHROPIC_API_KEY"))
+
 
 # ==================================================
 # 2. SESSION STATE
 # ==================================================
 
-defaults = {
+DEFAULTS = {
     "authenticated": False,
+    "attempts": 0,
     "messages": [],
     "student_class": "Class 10",
     "subject": "Mathematics",
-    "language": "Simple English"
+    "language": "Simple English",
+    "use_ai": True,
+    "quiz_version": 0,
 }
-
-for key, value in defaults.items():
-    if key not in st.session_state:
-        st.session_state[key] = value
+for _key, _value in DEFAULTS.items():
+    if _key not in st.session_state:
+        st.session_state[_key] = _value
 
 # ==================================================
-# 3. PROFESSIONAL DESIGN
+# 3. STYLING
 # ==================================================
 
-st.markdown("""
+st.markdown(
+    """
 <style>
-.stApp {
-    background: linear-gradient(135deg, #071426, #102d50);
-    color: #ffffff;
-}
+@import url('https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu&display=swap');
 
-[data-testid="stSidebar"] {
-    background: #081a30;
-}
+.stApp { background: linear-gradient(135deg, #071426, #102d50); color: #ffffff; }
+[data-testid="stSidebar"] { background: #081a30; }
 
-.main-title {
-    text-align: center;
-    font-size: 36px;
-    font-weight: 900;
-    color: #55c7ff;
-}
-
-.subtitle {
-    text-align: center;
-    color: #c4d9ee;
-    font-size: 16px;
-}
+.main-title { text-align: center; font-size: 36px; font-weight: 900; color: #55c7ff; }
+.subtitle { text-align: center; color: #c4d9ee; font-size: 16px; }
 
 .panel {
     background: rgba(22, 55, 88, 0.75);
@@ -95,505 +118,389 @@ st.markdown("""
     margin-bottom: 12px;
 }
 
-div.stButton > button {
-    background: #078bd5;
-    color: white;
-    border: none;
-    border-radius: 10px;
-    font-weight: bold;
-    min-height: 42px;
+div.stButton > button, div.stFormSubmitButton > button {
+    background: #078bd5; color: white; border: none;
+    border-radius: 10px; font-weight: bold; min-height: 42px;
+}
+div.stButton > button:hover, div.stFormSubmitButton > button:hover {
+    background: #0069a8; color: white;
 }
 
-div.stButton > button:hover {
-    background: #0069a8;
-    color: white;
-}
+h1, h2, h3 { color: #67caff; }
 
-h1, h2, h3 {
-    color: #67caff;
+.rtl {
+    direction: rtl; text-align: right;
+    font-family: 'Noto Nastaliq Urdu', 'Jameel Noori Nastaleeq', serif;
+    line-height: 2.1;
 }
-
+.done { text-decoration: line-through; opacity: 0.6; }
 </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
 # ==================================================
-# 4. DATABASE FUNCTIONS
+# 4. STORAGE HELPERS
 # ==================================================
 
-def load_json(filename, default):
-    if not os.path.exists(filename):
+
+def load_json(path: Path, default):
+    if not path.exists():
         return default
-
     try:
-        with open(filename, "r", encoding="utf-8") as f:
+        with path.open("r", encoding="utf-8") as f:
             return json.load(f)
     except (json.JSONDecodeError, OSError):
         return default
 
 
-def save_json(filename, data):
-    with open(filename, "w", encoding="utf-8") as f:
+def save_json(path: Path, data) -> None:
+    tmp = path.with_suffix(".tmp")
+    with tmp.open("w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
+    tmp.replace(path)  # atomic write
+
+
+def load_items(path: Path) -> list[dict]:
+    """Load a list of records and make sure each has a unique id."""
+    items = load_json(path, [])
+    if not isinstance(items, list):
+        return []
+    changed = False
+    for item in items:
+        if "id" not in item:
+            item["id"] = uuid.uuid4().hex
+            changed = True
+    if changed:
+        save_json(path, items)
+    return items
 
 
 # ==================================================
-# 5. KNOWLEDGE BASE
+# 5. KNOWLEDGE BASE  (answer, subject)
 # ==================================================
 
-KNOWLEDGE = {
-    "what is computer": {
-        "answer": "A computer is an electronic device that accepts data, processes it, stores it and produces information.",
-        "subject": "Computer Science"
-    },
-
-    "what is ai": {
-        "answer": "Artificial Intelligence (AI) is a branch of computer science that develops systems able to perform tasks such as recognizing patterns, understanding language and solving problems.",
-        "subject": "Computer Science"
-    },
-
-    "what is internet": {
-        "answer": "The Internet is a worldwide network of connected computers and devices that exchange information.",
-        "subject": "Computer Science"
-    },
-
-    "what is website": {
-        "answer": "A website is a collection of connected web pages that people can access through a web browser.",
-        "subject": "Computer Science"
-    },
-
-    "what is python": {
-        "answer": "Python is a high-level programming language known for readable syntax. It is used in automation, data science, websites and AI.",
-        "subject": "Computer Science"
-    },
-
-    "what is algorithm": {
-        "answer": "An algorithm is a step-by-step procedure for solving a problem or completing a task.",
-        "subject": "Computer Science"
-    },
-
-    "what is hardware": {
-        "answer": "Hardware means the physical parts of a computer, such as the keyboard, mouse, monitor and processor.",
-        "subject": "Computer Science"
-    },
-
-    "what is software": {
-        "answer": "Software is a set of programs and instructions that tell a computer what to do.",
-        "subject": "Computer Science"
-    },
-
-    "what is cpu": {
-        "answer": "CPU stands for Central Processing Unit. It executes instructions and performs calculations in a computer.",
-        "subject": "Computer Science"
-    },
-
-    "what is ram": {
-        "answer": "RAM stands for Random Access Memory. It temporarily stores data that the computer is currently using.",
-        "subject": "Computer Science"
-    },
-
-    "what is photosynthesis": {
-        "answer": "Photosynthesis is the process by which green plants use sunlight, water and carbon dioxide to make glucose and release oxygen.",
-        "subject": "Biology"
-    },
-
-    "what is cell": {
-        "answer": "A cell is the basic structural and functional unit of life. All living organisms are made of one or more cells.",
-        "subject": "Biology"
-    },
-
-    "what is nucleus": {
-        "answer": "The nucleus is a cell organelle that contains genetic material and helps control cell activities.",
-        "subject": "Biology"
-    },
-
-    "what is dna": {
-        "answer": "DNA stands for Deoxyribonucleic Acid. It carries genetic information in living organisms.",
-        "subject": "Biology"
-    },
-
-    "what is ecosystem": {
-        "answer": "An ecosystem includes living organisms and the non-living environment interacting with one another.",
-        "subject": "Biology"
-    },
-
-    "what is respiration": {
-        "answer": "Respiration is the process by which cells release energy from food molecules.",
-        "subject": "Biology"
-    },
-
-    "what is atom": {
-        "answer": "An atom is the smallest unit of an element that retains the chemical properties of that element.",
-        "subject": "Chemistry"
-    },
-
-    "what is molecule": {
-        "answer": "A molecule consists of two or more atoms chemically bonded together.",
-        "subject": "Chemistry"
-    },
-
-    "what is element": {
-        "answer": "An element is a pure substance made up of atoms that have the same number of protons.",
-        "subject": "Chemistry"
-    },
-
-    "what is compound": {
-        "answer": "A compound is a pure substance formed when two or more different elements chemically combine in fixed proportions.",
-        "subject": "Chemistry"
-    },
-
-    "what is acid": {
-        "answer": "An acid is a substance that donates hydrogen ions in an aqueous solution. Many common acids have a pH below 7.",
-        "subject": "Chemistry"
-    },
-
-    "what is gravity": {
-        "answer": "Gravity is the attractive force between objects that have mass. Earth's gravity pulls objects toward its centre.",
-        "subject": "Physics"
-    },
-
-    "what is force": {
-        "answer": "Force is a push or pull that can change an object's motion or shape. Its SI unit is the newton.",
-        "subject": "Physics"
-    },
-
-    "what is energy": {
-        "answer": "Energy is the capacity to do work or cause change. Common forms include kinetic, potential, thermal and electrical energy.",
-        "subject": "Physics"
-    },
-
-    "what is speed": {
-        "answer": "Speed is the distance travelled per unit of time. Formula: Speed = Distance / Time.",
-        "subject": "Physics"
-    },
-
-    "what is electricity": {
-        "answer": "Electricity involves electric charges and their movement. It is used to power many everyday devices.",
-        "subject": "Physics"
-    },
-
-    "what is mathematics": {
-        "answer": "Mathematics is the study of numbers, quantities, shapes, patterns and logical relationships.",
-        "subject": "Mathematics"
-    },
-
-    "what is algebra": {
-        "answer": "Algebra is a branch of mathematics that uses letters and symbols to represent unknown values.",
-        "subject": "Mathematics"
-    },
-
-    "what is geometry": {
-        "answer": "Geometry is the branch of mathematics that studies points, lines, angles, shapes and space.",
-        "subject": "Mathematics"
-    },
-
-    "what is percentage": {
-        "answer": "A percentage is a number expressed as a fraction of 100. For example, 25% means 25 out of 100.",
-        "subject": "Mathematics"
-    },
-
-    "what is english": {
-        "answer": "English is a language used for communication, education, literature and international exchange.",
-        "subject": "English"
-    },
-
-    "what is noun": {
-        "answer": "A noun is a word used to name a person, place, thing or idea. Examples include teacher, school, book and honesty.",
-        "subject": "English"
-    },
-
-    "what is verb": {
-        "answer": "A verb is a word that expresses an action or a state of being. Examples include run, write, think and is.",
-        "subject": "English"
-    },
-
-    "what is adjective": {
-        "answer": "An adjective describes a noun or pronoun. Examples include beautiful, tall, clever and blue.",
-        "subject": "English"
-    },
-
-    "what is pakistan": {
-        "answer": "Pakistan is a country in South Asia. It became independent on 14 August 1947.",
-        "subject": "Pakistan Studies"
-    },
-
-    "who founded pakistan": {
-        "answer": "Muhammad Ali Jinnah is widely known as the founder of Pakistan and its first Governor-General.",
-        "subject": "Pakistan Studies"
-    },
-
-    "when pakistan became independent": {
-        "answer": "Pakistan became independent on 14 August 1947.",
-        "subject": "Pakistan Studies"
-    },
-
-    "what is democracy": {
-        "answer": "Democracy is a system of government in which people participate in choosing their representatives.",
-        "subject": "History"
-    },
-
-    "what is geography": {
-        "answer": "Geography is the study of Earth, its physical features, people, places and environments.",
-        "subject": "Geography"
-    },
-
-    "what is history": {
-        "answer": "History is the study of past events and human societies using evidence and historical sources.",
-        "subject": "History"
-    },
-
-    "what is water": {
-        "answer": "Water is a substance essential for life. A water molecule contains two hydrogen atoms and one oxygen atom: H2O.",
-        "subject": "General Science"
-    },
-
-    "what is environment": {
-        "answer": "The environment includes the surroundings, conditions and natural systems in which living organisms exist.",
-        "subject": "General Science"
-    },
-
-    "what is islam": {
-        "answer": "Islam is a monotheistic religion. Muslims believe in one God, Allah, and follow the teachings of the Quran and Prophet Muhammad (peace be upon him).",
-        "subject": "Islamiat"
-    },
-
-    "what is zakat": {
-        "answer": "Zakat is an obligatory form of charity in Islam for eligible Muslims who meet the required conditions.",
-        "subject": "Islamiat"
-    },
-
-    "what is ramadan": {
-        "answer": "Ramadan is the ninth month of the Islamic lunar calendar. Muslims who are able observe fasting during this month.",
-        "subject": "Islamiat"
-    }
+KNOWLEDGE: dict[str, tuple[str, str]] = {
+    # ---- Computer Science
+    "what is computer": ("A computer is an electronic device that accepts data, processes it, stores it and produces information.", "Computer Science"),
+    "what is ai": ("Artificial Intelligence (AI) is a branch of computer science that develops systems able to perform tasks such as recognizing patterns, understanding language and solving problems.", "Computer Science"),
+    "what is internet": ("The Internet is a worldwide network of connected computers and devices that exchange information.", "Computer Science"),
+    "what is website": ("A website is a collection of connected web pages that people can access through a web browser.", "Computer Science"),
+    "what is python": ("Python is a high-level programming language known for readable syntax. It is used in automation, data science, websites and AI.", "Computer Science"),
+    "what is algorithm": ("An algorithm is a step-by-step procedure for solving a problem or completing a task.", "Computer Science"),
+    "what is hardware": ("Hardware means the physical parts of a computer, such as the keyboard, mouse, monitor and processor.", "Computer Science"),
+    "what is software": ("Software is a set of programs and instructions that tell a computer what to do.", "Computer Science"),
+    "what is cpu": ("CPU stands for Central Processing Unit. It executes instructions and performs calculations in a computer.", "Computer Science"),
+    "what is ram": ("RAM stands for Random Access Memory. It temporarily stores data that the computer is currently using.", "Computer Science"),
+    # ---- Biology
+    "what is photosynthesis": ("Photosynthesis is the process by which green plants use sunlight, water and carbon dioxide to make glucose and release oxygen.", "Biology"),
+    "what is cell": ("A cell is the basic structural and functional unit of life. All living organisms are made of one or more cells.", "Biology"),
+    "what is nucleus": ("The nucleus is a cell organelle that contains genetic material and helps control cell activities.", "Biology"),
+    "what is dna": ("DNA stands for Deoxyribonucleic Acid. It carries genetic information in living organisms.", "Biology"),
+    "what is ecosystem": ("An ecosystem includes living organisms and the non-living environment interacting with one another.", "Biology"),
+    "what is respiration": ("Respiration is the process by which cells release energy from food molecules.", "Biology"),
+    # ---- Chemistry
+    "what is atom": ("An atom is the smallest unit of an element that retains the chemical properties of that element.", "Chemistry"),
+    "what is molecule": ("A molecule consists of two or more atoms chemically bonded together.", "Chemistry"),
+    "what is element": ("An element is a pure substance made up of atoms that have the same number of protons.", "Chemistry"),
+    "what is compound": ("A compound is a pure substance formed when two or more different elements chemically combine in fixed proportions.", "Chemistry"),
+    "what is acid": ("An acid is a substance that donates hydrogen ions in an aqueous solution. Many common acids have a pH below 7.", "Chemistry"),
+    # ---- Physics
+    "what is gravity": ("Gravity is the attractive force between objects that have mass. Earth's gravity pulls objects toward its centre.", "Physics"),
+    "what is force": ("Force is a push or pull that can change an object's motion or shape. Its SI unit is the newton.", "Physics"),
+    "what is energy": ("Energy is the capacity to do work or cause change. Common forms include kinetic, potential, thermal and electrical energy.", "Physics"),
+    "what is speed": ("Speed is the distance travelled per unit of time. Formula: Speed = Distance / Time.", "Physics"),
+    "what is electricity": ("Electricity involves electric charges and their movement. It is used to power many everyday devices.", "Physics"),
+    # ---- Mathematics
+    "what is mathematics": ("Mathematics is the study of numbers, quantities, shapes, patterns and logical relationships.", "Mathematics"),
+    "what is algebra": ("Algebra is a branch of mathematics that uses letters and symbols to represent unknown values.", "Mathematics"),
+    "what is geometry": ("Geometry is the branch of mathematics that studies points, lines, angles, shapes and space.", "Mathematics"),
+    "what is percentage": ("A percentage is a number expressed as a fraction of 100. For example, 25% means 25 out of 100.", "Mathematics"),
+    # ---- English
+    "what is english": ("English is a language used for communication, education, literature and international exchange.", "English"),
+    "what is noun": ("A noun is a word used to name a person, place, thing or idea. Examples include teacher, school, book and honesty.", "English"),
+    "what is verb": ("A verb is a word that expresses an action or a state of being. Examples include run, write, think and is.", "English"),
+    "what is adjective": ("An adjective describes a noun or pronoun. Examples include beautiful, tall, clever and blue.", "English"),
+    # ---- Pakistan Studies / History / Geography
+    "what is pakistan": ("Pakistan is a country in South Asia. It became independent on 14 August 1947.", "Pakistan Studies"),
+    "who founded pakistan": ("Muhammad Ali Jinnah is widely known as the founder of Pakistan and its first Governor-General.", "Pakistan Studies"),
+    "when pakistan became independent": ("Pakistan became independent on 14 August 1947.", "Pakistan Studies"),
+    "what is democracy": ("Democracy is a system of government in which people participate in choosing their representatives.", "History"),
+    "what is geography": ("Geography is the study of Earth, its physical features, people, places and environments.", "Geography"),
+    "what is history": ("History is the study of past events and human societies using evidence and historical sources.", "History"),
+    # ---- General Science
+    "what is water": ("Water is a substance essential for life. A water molecule contains two hydrogen atoms and one oxygen atom: H2O.", "General Science"),
+    "what is environment": ("The environment includes the surroundings, conditions and natural systems in which living organisms exist.", "General Science"),
+    # ---- Islamiat
+    "what is islam": ("Islam is a monotheistic religion. Muslims believe in one God, Allah, and follow the teachings of the Quran and Prophet Muhammad (peace be upon him).", "Islamiat"),
+    "what is zakat": ("Zakat is an obligatory form of charity in Islam for eligible Muslims who meet the required conditions.", "Islamiat"),
+    "what is ramadan": ("Ramadan is the ninth month of the Islamic lunar calendar. Muslims who are able observe fasting during this month.", "Islamiat"),
 }
-
-# ==================================================
-# 6. URDU ANSWER TRANSLATIONS
-# ==================================================
 
 URDU_ANSWERS = {
-    "what is computer":
-        "کمپیوٹر ایک الیکٹرانک مشین ہے جو ڈیٹا وصول کرتی ہے، اسے پراسیس کرتی ہے، محفوظ کرتی ہے اور معلومات فراہم کرتی ہے۔",
-
-    "what is ai":
-        "مصنوعی ذہانت (AI) کمپیوٹر سائنس کی ایک شاخ ہے جو مشینوں کو مختلف ذہین کام کرنے کے قابل بناتی ہے۔",
-
-    "what is internet":
-        "انٹرنیٹ دنیا بھر کے کمپیوٹرز اور آلات کا ایک نیٹ ورک ہے جو معلومات کا تبادلہ کرتا ہے۔",
-
-    "what is photosynthesis":
-        "ضیائی تالیف وہ عمل ہے جس میں سبز پودے سورج کی روشنی، پانی اور کاربن ڈائی آکسائیڈ کی مدد سے خوراک بناتے ہیں۔",
-
-    "what is cell":
-        "خلیہ زندگی کی بنیادی ساختی اور فعلی اکائی ہے۔ تمام جاندار ایک یا زیادہ خلیوں سے بنے ہوتے ہیں۔",
-
-    "what is gravity":
-        "کششِ ثقل وہ قوت ہے جو اجسام کو ایک دوسرے کی طرف کھینچتی ہے۔ زمین کی کشش ہمیں زمین پر رکھتی ہے۔",
-
-    "what is pakistan":
-        "پاکستان جنوبی ایشیا کا ایک ملک ہے۔ پاکستان 14 اگست 1947 کو آزاد ہوا۔",
-
-    "what is force":
-        "قوت کسی چیز کو دھکا دینے یا کھینچنے کا عمل ہے۔ قوت کی SI اکائی نیوٹن ہے۔",
-
-    "what is water":
-        "پانی زندگی کے لیے ضروری ہے۔ اس کا کیمیائی فارمولا H2O ہے۔"
+    "what is computer": "کمپیوٹر ایک الیکٹرانک مشین ہے جو ڈیٹا وصول کرتی ہے، اسے پراسیس کرتی ہے، محفوظ کرتی ہے اور معلومات فراہم کرتی ہے۔",
+    "what is ai": "مصنوعی ذہانت (AI) کمپیوٹر سائنس کی ایک شاخ ہے جو مشینوں کو مختلف ذہین کام کرنے کے قابل بناتی ہے۔",
+    "what is internet": "انٹرنیٹ دنیا بھر کے کمپیوٹرز اور آلات کا ایک نیٹ ورک ہے جو معلومات کا تبادلہ کرتا ہے۔",
+    "what is photosynthesis": "ضیائی تالیف وہ عمل ہے جس میں سبز پودے سورج کی روشنی، پانی اور کاربن ڈائی آکسائیڈ کی مدد سے خوراک بناتے ہیں۔",
+    "what is cell": "خلیہ زندگی کی بنیادی ساختی اور فعلی اکائی ہے۔ تمام جاندار ایک یا زیادہ خلیوں سے بنے ہوتے ہیں۔",
+    "what is gravity": "کششِ ثقل وہ قوت ہے جو اجسام کو ایک دوسرے کی طرف کھینچتی ہے۔ زمین کی کشش ہمیں زمین پر رکھتی ہے۔",
+    "what is pakistan": "پاکستان جنوبی ایشیا کا ایک ملک ہے۔ پاکستان 14 اگست 1947 کو آزاد ہوا۔",
+    "what is force": "قوت کسی چیز کو دھکا دینے یا کھینچنے کا عمل ہے۔ قوت کی SI اکائی نیوٹن ہے۔",
+    "what is water": "پانی زندگی کے لیے ضروری ہے۔ اس کا کیمیائی فارمولا H2O ہے۔",
 }
 
+GREETINGS = {"hello", "hi", "hey", "salam", "assalamualaikum", "assalam"}
+
 # ==================================================
-# 7. CHATBOT ENGINE
+# 6. CHATBOT ENGINE
 # ==================================================
 
-def chatbot(question, subject, language, student_class):
+
+def normalize(question: str) -> str:
+    """Lower-case, strip punctuation and rewrite 'define X' as 'what is X'."""
     q = question.lower().strip()
+    q = re.sub(r"[^\w\s']", " ", q)
+    q = re.sub(r"\s+", " ", q).strip()
+    q = q.replace("what's", "what is").replace("whats", "what is")
+    q = re.sub(
+        r"^(define|explain|describe|meaning of|tell me about|what are|what do you mean by)\s+",
+        "what is ",
+        q,
+    )
+    q = re.sub(r"^what is (an?|the) ", "what is ", q)
+    return q
 
+
+def find_in_knowledge(question: str) -> str | None:
+    """Return the matching knowledge-base key, or None."""
+    nq = normalize(question)
+    if nq in KNOWLEDGE:
+        return nq
+
+    # Whole-phrase match (word boundaries, so 'air' never matches 'ai').
+    for key in KNOWLEDGE:
+        if re.search(rf"\b{re.escape(key)}\b", nq):
+            return key
+
+    # Typo tolerance for longer topics only (acronyms need exact matches).
+    topic = nq.removeprefix("what is ")
+    best_key, best_score = None, 0.0
+    if len(topic) >= 5:
+        for key in KNOWLEDGE:
+            candidate = key.removeprefix("what is ")
+            if len(candidate) < 5:
+                continue
+            score = difflib.SequenceMatcher(None, topic, candidate).ratio()
+            if score > best_score:
+                best_key, best_score = key, score
+    return best_key if best_score >= 0.85 else None
+
+
+def ask_ai(question, subject, language, student_class, history) -> str | None:
+    """Ask Claude. Returns None if AI is unavailable or the call fails."""
+    if not ai_available():
+        return None
+
+    system = (
+        "You are a friendly, accurate school tutor for students in Pakistan. "
+        f"The student is in {student_class} and is studying {subject}. "
+        f"Answer in {language}. Keep answers clear, correct, age-appropriate "
+        "and reasonably short, with a simple example when helpful. "
+        "If a request is unsafe or not educational, politely redirect to studying."
+    )
+    messages = [
+        {"role": m["role"], "content": m["content"]}
+        for m in history[-10:]
+        if m["role"] in ("user", "assistant")
+    ]
+    while messages and messages[0]["role"] != "user":
+        messages.pop(0)
+    messages.append({"role": "user", "content": question})
+
+    try:
+        client = anthropic.Anthropic(api_key=get_secret("ANTHROPIC_API_KEY"))
+        response = client.messages.create(
+            model=AI_MODEL,
+            max_tokens=800,
+            system=system,
+            messages=messages,
+        )
+        return "".join(b.text for b in response.content if b.type == "text").strip()
+    except Exception:
+        return None
+
+
+def chatbot(question, subject, language, student_class, history) -> tuple[str, str]:
+    """Return (answer, source)."""
+    q = normalize(question)
     if not q:
-        return "Please enter a question."
+        return "Please enter a question.", "System"
 
-    greetings = ["hello", "hi", "hey", "salam", "assalamualaikum"]
-
-    if q in greetings:
+    words = q.split()
+    if words and words[0] in GREETINGS and len(words) <= 3:
         if language == "Urdu":
-            return "السلام علیکم! میں آپ کا School AI Assistant ہوں۔ اپنا سوال پوچھیں۔"
-
+            return "السلام علیکم! میں آپ کا School AI Assistant ہوں۔ اپنا سوال پوچھیں۔", "System"
         if language == "Roman Urdu":
-            return "Assalamualaikum! Main aap ka School AI Assistant hoon. Apna sawal poochain."
+            return "Assalamualaikum! Main aap ka School AI Assistant hoon. Apna sawal poochain.", "System"
+        return "Hello! Welcome to Muhammad Abdullah School AI. What would you like to learn today?", "System"
 
-        return "Hello! Welcome to Muhammad Abdullah School AI. What would you like to learn today?"
-
-    # Search exact and partial question matches
-    for key, item in KNOWLEDGE.items():
-        if q == key or key in q:
-            if language == "Urdu":
-                return URDU_ANSWERS.get(key, item["answer"])
-
-            if language == "Roman Urdu":
-                return "Jawab: " + item["answer"]
-
-            return (
-                f"**Answer:** {item['answer']}\n\n"
-                f"**Subject:** {item['subject']}\n"
-                f"**Class:** {student_class}"
-            )
-
-    # Simple maths detection
-    math_words = ["calculate", "solve", "plus", "minus", "multiply"]
-
-    if any(word in q for word in math_words):
+    key = find_in_knowledge(question)
+    if key:
+        answer, topic_subject = KNOWLEDGE[key]
+        if language == "Urdu":
+            return URDU_ANSWERS.get(key, answer), "Knowledge base"
+        if language == "Roman Urdu":
+            return "Jawab: " + answer, "Knowledge base"
         return (
-            "I can help with basic calculations. "
-            "Open the Calculator section and enter a mathematical expression."
+            f"**Answer:** {answer}  \n"
+            f"**Subject:** {topic_subject}  \n"
+            f"**Class:** {student_class}",
+            "Knowledge base",
         )
 
-    # Subject-based fallback
+    if any(w in q for w in ("calculate", "solve", "plus", "minus", "multiply")):
+        return (
+            "I can help with basic calculations. Open the **Calculator** page "
+            "and enter a mathematical expression.",
+            "System",
+        )
+
+    if st.session_state.use_ai:
+        ai_answer = ask_ai(question, subject, language, student_class, history)
+        if ai_answer:
+            return ai_answer, "AI tutor"
+
     if language == "Urdu":
         return (
-            f"آپ کا سوال {subject} کے بارے میں موصول ہوا ہے۔ "
-            "اس آف لائن ڈیمو میں اس سوال کا تیار شدہ جواب موجود نہیں۔ "
-            "براہ کرم سوال کو آسان الفاظ میں لکھیں۔"
+            f"آپ کا سوال {subject} کے بارے میں موصول ہوا ہے۔ اس سوال کا تیار شدہ جواب "
+            "موجود نہیں۔ براہ کرم سوال کو آسان الفاظ میں لکھیں۔",
+            "System",
         )
-
     if language == "Roman Urdu":
         return (
-            f"Aap ka sawal {subject} ke bare mein hai. "
-            "Is offline demo mein is sawal ka jawab mojood nahi. "
-            "Meherbani karke sawal asaan alfaaz mein likhein."
+            f"Aap ka sawal {subject} ke bare mein hai. Is sawal ka tayyar jawab mojood nahi. "
+            "Meherbani karke sawal asaan alfaaz mein likhein.",
+            "System",
         )
-
     return (
-        f"I received your question about **{subject}** for **{student_class}**.\n\n"
-        "I do not have a prepared answer for this question in my offline "
-        "knowledge base yet. Try using different words or choose a related "
-        "topic from the subject."
+        f"I received your question about **{subject}** for **{student_class}**, "
+        "but I do not have a prepared answer for it. Try different words, or "
+        "choose a related topic.",
+        "System",
     )
 
+
 # ==================================================
-# 8. SAFE CALCULATOR
+# 7. SAFE CALCULATOR
 # ==================================================
 
-OPERATORS = {
+BINARY_OPS = {
     ast.Add: operator.add,
     ast.Sub: operator.sub,
     ast.Mult: operator.mul,
     ast.Div: operator.truediv,
     ast.Pow: operator.pow,
-    ast.USub: operator.neg,
-    ast.Mod: operator.mod
+    ast.Mod: operator.mod,
 }
+UNARY_OPS = {ast.USub: operator.neg, ast.UAdd: operator.pos}
 
-def safe_calculate(expression):
 
-    def evaluate(node):
-
-        if isinstance(node, ast.Expression):
-            return evaluate(node.body)
-
-        if isinstance(node, ast.Constant):
-            if type(node.value) in (int, float):
-                return node.value
-
-        if isinstance(node, ast.BinOp):
-            if type(node.op) not in OPERATORS:
-                raise ValueError("Unsupported operation")
-
-            left = evaluate(node.left)
-            right = evaluate(node.right)
-
-            if isinstance(node.op, ast.Pow) and abs(right) > 10:
-                raise ValueError("Exponent too large")
-
-            result = OPERATORS[type(node.op)](left, right)
-
-            if abs(result) > 10**12:
-                raise ValueError("Result too large")
-
-            return result
-
-        if isinstance(node, ast.UnaryOp):
-            if type(node.op) not in OPERATORS:
-                raise ValueError("Unsupported operation")
-
-            return OPERATORS[type(node.op)](evaluate(node.operand))
-
+def safe_calculate(expression: str):
+    expression = (
+        expression.replace("^", "**").replace("×", "*").replace("÷", "/").strip()
+    )
+    if not expression or len(expression) > 100:
         raise ValueError("Invalid expression")
 
-    return evaluate(ast.parse(expression, mode="eval"))
+    def evaluate(node):
+        if isinstance(node, ast.Expression):
+            return evaluate(node.body)
+        if isinstance(node, ast.Constant) and type(node.value) in (int, float):
+            return node.value
+        if isinstance(node, ast.BinOp) and type(node.op) in BINARY_OPS:
+            left, right = evaluate(node.left), evaluate(node.right)
+            if isinstance(node.op, ast.Pow) and abs(right) > 10:
+                raise ValueError("Exponent too large")
+            result = BINARY_OPS[type(node.op)](left, right)
+            if abs(result) > 10**12:
+                raise ValueError("Result too large")
+            return result
+        if isinstance(node, ast.UnaryOp) and type(node.op) in UNARY_OPS:
+            return UNARY_OPS[type(node.op)](evaluate(node.operand))
+        raise ValueError("Invalid expression")
+
+    result = evaluate(ast.parse(expression, mode="eval"))
+    if isinstance(result, float):
+        result = int(result) if result.is_integer() else round(result, 10)
+    return result
+
 
 # ==================================================
-# 9. LOGIN SCREEN
+# 8. LOGIN
 # ==================================================
 
-def login_screen():
 
-    st.markdown(
-        '<div class="main-title">🎓 Muhammad Abdullah School AI</div>',
-        unsafe_allow_html=True
-    )
-
-    st.markdown(
-        '<div class="subtitle">Your Professional Learning Assistant</div>',
-        unsafe_allow_html=True
-    )
-
-    st.write("")
+def login_screen() -> None:
+    st.markdown(f'<div class="main-title">🎓 {APP_NAME}</div>', unsafe_allow_html=True)
+    st.markdown('<div class="subtitle">Your Professional Learning Assistant</div>', unsafe_allow_html=True)
     st.write("")
 
-    left, center, right = st.columns([1, 1.3, 1])
-
+    _, center, _ = st.columns([1, 1.3, 1])
     with center:
+        expected = get_secret("APP_PASSWORD")
 
-        st.markdown('<div class="panel">', unsafe_allow_html=True)
+        if not expected:
+            st.error("No password is configured.")
+            st.markdown(
+                "Create `.streamlit/secrets.toml` next to `app.py` and add:"
+            )
+            st.code('APP_PASSWORD = "choose-a-strong-password"', language="toml")
+            return
 
         st.subheader("🔐 Secure Login")
-        st.write("Enter your password to continue.")
+        locked = st.session_state.attempts >= MAX_LOGIN_ATTEMPTS
 
-        password = st.text_input(
-            "School AI Password",
-            type="password",
-            placeholder="Enter password"
-        )
+        with st.form("login_form"):
+            password = st.text_input("Password", type="password", placeholder="Enter password")
+            submitted = st.form_submit_button("🚀 Open School AI", use_container_width=True)
 
-        if st.button("🚀 Open School AI", use_container_width=True):
-
-            if password == APP_PASSWORD:
+        if submitted:
+            if locked:
+                st.error("Too many failed attempts. Refresh the page to try again.")
+            elif hmac.compare_digest(password.encode(), expected.encode()):
                 st.session_state.authenticated = True
+                st.session_state.attempts = 0
                 st.rerun()
             else:
-                st.error("Incorrect password. Please try again.")
+                st.session_state.attempts += 1
+                left = MAX_LOGIN_ATTEMPTS - st.session_state.attempts
+                st.error(f"Incorrect password. Attempts left: {max(left, 0)}")
 
-        st.markdown('</div>', unsafe_allow_html=True)
+        st.caption(f"© {APP_NAME}")
 
-        st.caption("© Muhammad Abdullah School AI")
 
 # ==================================================
-# 10. HOME DASHBOARD
+# 9. PAGES
 # ==================================================
 
-def home_page():
 
-    st.markdown(
-        '<div class="main-title">Welcome to School AI 🎓</div>',
-        unsafe_allow_html=True
-    )
-
-    st.markdown(
-        '<div class="subtitle">Learn Smarter • Study Better • Achieve More</div>',
-        unsafe_allow_html=True
-    )
-
+def home_page() -> None:
+    st.markdown('<div class="main-title">Welcome to School AI 🎓</div>', unsafe_allow_html=True)
+    st.markdown('<div class="subtitle">Learn Smarter • Study Better • Achieve More</div>', unsafe_allow_html=True)
     st.write("")
 
-    a, b, c = st.columns(3)
+    notes = load_items(NOTES_FILE)
+    tasks = load_items(PLANNER_FILE)
+    pending = sum(1 for t in tasks if not t.get("completed"))
 
-    a.metric("Classes", "1–10")
-    b.metric("Subjects", len(SUBJECTS))
-    c.metric("Knowledge Topics", len(KNOWLEDGE))
+    a, b, c, d = st.columns(4)
+    a.metric("Subjects", len(SUBJECTS))
+    b.metric("Knowledge Topics", len(KNOWLEDGE))
+    c.metric("Saved Notes", len(notes))
+    d.metric("Pending Tasks", pending)
 
     st.divider()
-
     st.subheader("🚀 Learning Tools")
-
-    columns = st.columns(3)
 
     cards = [
         ("🤖 AI Chatbot", "Ask educational questions."),
@@ -601,473 +508,351 @@ def home_page():
         ("📝 Notes", "Write and save study notes."),
         ("🧠 Quiz", "Test your knowledge."),
         ("📅 Study Planner", "Organize your study tasks."),
-        ("📚 Knowledge Base", "Explore prepared questions.")
+        ("📚 Knowledge Base", "Explore prepared questions."),
     ]
-
+    columns = st.columns(3)
     for i, (title, description) in enumerate(cards):
         with columns[i % 3]:
             st.markdown(
-                f"""
-                <div class="panel">
-                <h3>{title}</h3>
-                <p>{description}</p>
-                </div>
-                """,
-                unsafe_allow_html=True
+                f'<div class="panel"><h3>{title}</h3><p>{description}</p></div>',
+                unsafe_allow_html=True,
             )
 
-    st.info(
-        "This is an offline educational demo. "
-        "Its answers come from the built-in knowledge base."
-    )
+    if ai_available():
+        st.success("AI tutor is connected. Unknown questions are answered by AI.")
+    else:
+        st.info("Running in offline mode: answers come from the built-in knowledge base.")
 
-# ==================================================
-# 11. CHATBOT PAGE
-# ==================================================
 
-def chatbot_page():
+def render_message(msg: dict) -> None:
+    with st.chat_message(msg["role"]):
+        if msg.get("rtl"):
+            safe = html.escape(msg["content"]).replace("\n", "<br>")
+            st.markdown(f'<div class="rtl">{safe}</div>', unsafe_allow_html=True)
+        else:
+            st.markdown(msg["content"])
+        if msg.get("source") and msg["source"] != "System":
+            st.caption(f"Source: {msg['source']}")
 
+
+def chatbot_page() -> None:
     st.title("🤖 School AI Chatbot")
+    s = st.session_state
+    st.caption(f"{s.student_class}  •  {s.subject}  •  {s.language}  (change in the sidebar)")
 
-    st.session_state.student_class = st.selectbox(
-        "Select Class",
-        CLASSES,
-        index=CLASSES.index(st.session_state.student_class)
-    )
-
-    st.session_state.subject = st.selectbox(
-        "Select Subject",
-        SUBJECTS,
-        index=SUBJECTS.index(st.session_state.subject)
-    )
-
-    st.session_state.language = st.selectbox(
-        "Answer Language",
-        ["Simple English", "Urdu", "Roman Urdu"],
-        index=["Simple English", "Urdu", "Roman Urdu"].index(
-            st.session_state.language
-        )
-    )
-
-    st.divider()
-
-    for message in st.session_state.messages:
-
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+    for message in s.messages:
+        render_message(message)
 
     question = st.chat_input("Ask your educational question...")
-
     if question:
-
-        st.session_state.messages.append({
-            "role": "user",
-            "content": question
-        })
-
-        answer = chatbot(
-            question,
-            st.session_state.subject,
-            st.session_state.language,
-            st.session_state.student_class
+        history = list(s.messages)
+        s.messages.append({"role": "user", "content": question})
+        with st.spinner("Thinking..."):
+            answer, source = chatbot(question, s.subject, s.language, s.student_class, history)
+        s.messages.append(
+            {"role": "assistant", "content": answer, "source": source, "rtl": s.language == "Urdu"}
         )
-
-        st.session_state.messages.append({
-            "role": "assistant",
-            "content": answer
-        })
-
         st.rerun()
 
-    if st.button("🗑️ Clear Conversation"):
-        st.session_state.messages = []
+    if s.messages and st.button("🗑️ Clear Conversation"):
+        s.messages = []
         st.rerun()
 
-# ==================================================
-# 12. CALCULATOR PAGE
-# ==================================================
 
-def calculator_page():
-
+def calculator_page() -> None:
     st.title("🧮 Smart Calculator")
 
-    expression = st.text_input(
-        "Enter mathematical expression",
-        placeholder="Example: (25 + 15) * 2"
-    )
+    with st.form("calc_form"):
+        expression = st.text_input("Enter mathematical expression", placeholder="Example: (25 + 15) * 2")
+        submitted = st.form_submit_button("Calculate")
 
-    if st.button("Calculate"):
-
+    if submitted:
         try:
-            result = safe_calculate(expression)
-            st.success(f"Answer: {result}")
-
+            st.success(f"Answer: {safe_calculate(expression)}")
+        except ZeroDivisionError:
+            st.error("You cannot divide by zero.")
         except Exception:
             st.error("Invalid calculation. Check your expression.")
 
     st.markdown("### Examples")
-    st.code("25 + 15")
-    st.code("100 / 5")
-    st.code("(10 + 5) * 3")
-    st.code("2 ** 4")
+    for example in ("25 + 15", "100 / 5", "(10 + 5) * 3", "2 ** 4", "17 % 5"):
+        st.code(example)
+    st.caption("Supported: + - * / ** (or ^) % and brackets.")
 
-# ==================================================
-# 13. NOTES PAGE
-# ==================================================
 
-def notes_page():
-
+def notes_page() -> None:
     st.title("📝 Study Notes Manager")
+    notes = load_items(NOTES_FILE)
 
-    notes = load_json(NOTES_FILE, [])
+    with st.form("note_form", clear_on_submit=True):
+        title = st.text_input("Note Title")
+        subject = st.selectbox("Note Subject", SUBJECTS)
+        content = st.text_area("Write Your Notes", height=180)
+        submitted = st.form_submit_button("💾 Save Note")
 
-    title = st.text_input("Note Title")
-    subject = st.selectbox("Note Subject", SUBJECTS)
-    content = st.text_area("Write Your Notes", height=180)
-
-    if st.button("💾 Save Note"):
-
+    if submitted:
         if title.strip() and content.strip():
-
-            notes.append({
-                "title": title.strip(),
-                "subject": subject,
-                "content": content.strip(),
-                "date": datetime.now().strftime("%Y-%m-%d %H:%M")
-            })
-
+            notes.append(
+                {
+                    "id": uuid.uuid4().hex,
+                    "title": title.strip(),
+                    "subject": subject,
+                    "content": content.strip(),
+                    "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                }
+            )
             save_json(NOTES_FILE, notes)
-
             st.success("Your note has been saved.")
             st.rerun()
-
         else:
             st.warning("Please enter a title and note.")
 
     st.divider()
     st.subheader("Saved Notes")
 
-    if not notes:
-        st.info("No notes saved yet.")
+    col1, col2 = st.columns([2, 1])
+    search = col1.text_input("Search notes", placeholder="Type a keyword...")
+    subject_filter = col2.selectbox("Filter by subject", ["All"] + SUBJECTS)
 
-    for index, note in enumerate(notes):
+    visible = [
+        n
+        for n in notes
+        if (subject_filter == "All" or n["subject"] == subject_filter)
+        and (not search or search.lower() in (n["title"] + " " + n["content"]).lower())
+    ]
 
+    if not visible:
+        st.info("No notes found.")
+
+    for note in reversed(visible):
         with st.expander(note["title"]):
-
-            st.caption(
-                f"{note['subject']} • {note['date']}"
-            )
-
+            st.caption(f"{note['subject']} • {note['date']}")
             st.write(note["content"])
-
-            if st.button("Delete Note", key=f"note_{index}"):
-
-                notes.pop(index)
-                save_json(NOTES_FILE, notes)
+            if st.button("Delete Note", key=f"del_note_{note['id']}"):
+                save_json(NOTES_FILE, [n for n in notes if n["id"] != note["id"]])
                 st.rerun()
 
-# ==================================================
-# 14. QUIZ PAGE
-# ==================================================
+    if notes:
+        st.download_button(
+            "⬇️ Export all notes (JSON)",
+            data=json.dumps(notes, ensure_ascii=False, indent=2),
+            file_name="school_ai_notes.json",
+            mime="application/json",
+        )
+
 
 QUIZ = [
-    {
-        "question": "What is the chemical formula of water?",
-        "options": ["CO2", "H2O", "O2", "NaCl"],
-        "answer": "H2O",
-        "explanation": "Water contains two hydrogen atoms and one oxygen atom."
-    },
-    {
-        "question": "What is the capital of Pakistan?",
-        "options": ["Lahore", "Karachi", "Islamabad", "Quetta"],
-        "answer": "Islamabad",
-        "explanation": "Islamabad is the capital city of Pakistan."
-    },
-    {
-        "question": "What does CPU stand for?",
-        "options": [
-            "Central Processing Unit",
-            "Computer Power Utility",
-            "Central Program User",
-            "Control Processing User"
-        ],
-        "answer": "Central Processing Unit",
-        "explanation": "CPU stands for Central Processing Unit."
-    },
-    {
-        "question": "What is 12 × 8?",
-        "options": ["86", "96", "108", "88"],
-        "answer": "96",
-        "explanation": "12 multiplied by 8 equals 96."
-    },
-    {
-        "question": "Which organelle contains genetic material?",
-        "options": ["Nucleus", "Ribosome", "Cell wall", "Vacuole"],
-        "answer": "Nucleus",
-        "explanation": "The nucleus contains most of the cell's genetic material."
-    },
-    {
-        "question": "Which force pulls objects toward Earth?",
-        "options": ["Friction", "Gravity", "Magnetism", "Tension"],
-        "answer": "Gravity",
-        "explanation": "Gravity attracts objects toward Earth's centre."
-    },
-    {
-        "question": "Who is known as the founder of Pakistan?",
-        "options": [
-            "Allama Iqbal",
-            "Liaquat Ali Khan",
-            "Muhammad Ali Jinnah",
-            "Sir Syed Ahmad Khan"
-        ],
-        "answer": "Muhammad Ali Jinnah",
-        "explanation": "Muhammad Ali Jinnah is widely known as the founder of Pakistan."
-    }
+    {"question": "What is the chemical formula of water?", "options": ["CO2", "H2O", "O2", "NaCl"], "answer": "H2O", "explanation": "Water contains two hydrogen atoms and one oxygen atom."},
+    {"question": "What is the capital of Pakistan?", "options": ["Lahore", "Karachi", "Islamabad", "Quetta"], "answer": "Islamabad", "explanation": "Islamabad is the capital city of Pakistan."},
+    {"question": "What does CPU stand for?", "options": ["Central Processing Unit", "Computer Power Utility", "Central Program User", "Control Processing User"], "answer": "Central Processing Unit", "explanation": "CPU stands for Central Processing Unit."},
+    {"question": "What is 12 × 8?", "options": ["86", "96", "108", "88"], "answer": "96", "explanation": "12 multiplied by 8 equals 96."},
+    {"question": "Which organelle contains genetic material?", "options": ["Nucleus", "Ribosome", "Cell wall", "Vacuole"], "answer": "Nucleus", "explanation": "The nucleus contains most of the cell's genetic material."},
+    {"question": "Which force pulls objects toward Earth?", "options": ["Friction", "Gravity", "Magnetism", "Tension"], "answer": "Gravity", "explanation": "Gravity attracts objects toward Earth's centre."},
+    {"question": "Who is known as the founder of Pakistan?", "options": ["Allama Iqbal", "Liaquat Ali Khan", "Muhammad Ali Jinnah", "Sir Syed Ahmad Khan"], "answer": "Muhammad Ali Jinnah", "explanation": "Muhammad Ali Jinnah is widely known as the founder of Pakistan."},
+    {"question": "Which planet is known as the Red Planet?", "options": ["Venus", "Mars", "Jupiter", "Mercury"], "answer": "Mars", "explanation": "Mars looks red because of iron oxide on its surface."},
+    {"question": "Which gas do plants absorb for photosynthesis?", "options": ["Oxygen", "Nitrogen", "Carbon dioxide", "Hydrogen"], "answer": "Carbon dioxide", "explanation": "Plants use carbon dioxide, water and sunlight to make glucose."},
+    {"question": "Which of these words is a noun?", "options": ["Quickly", "Teacher", "Beautiful", "Run"], "answer": "Teacher", "explanation": "A noun names a person, place, thing or idea."},
+    {"question": "In which year did Pakistan become independent?", "options": ["1940", "1947", "1956", "1971"], "answer": "1947", "explanation": "Pakistan became independent on 14 August 1947."},
 ]
+QUIZ_SIZE = 10
 
-def quiz_page():
 
+def new_quiz() -> None:
+    st.session_state.quiz_questions = random.sample(QUIZ, min(QUIZ_SIZE, len(QUIZ)))
+    st.session_state.quiz_version += 1  # new widget keys = fresh, unselected radios
+
+
+def quiz_page() -> None:
     st.title("🧠 Knowledge Quiz")
 
     if "quiz_questions" not in st.session_state:
-        st.session_state.quiz_questions = random.sample(
-            QUIZ, len(QUIZ)
-        )
+        new_quiz()
 
     questions = st.session_state.quiz_questions
+    version = st.session_state.quiz_version
 
-    with st.form("quiz_form"):
-
+    with st.form(f"quiz_form_{version}"):
         answers = []
-
         for i, item in enumerate(questions):
-
             st.markdown(f"**Q{i + 1}. {item['question']}**")
-
-            selected = st.radio(
-                "Choose an answer:",
-                item["options"],
-                key=f"quiz_answer_{i}",
-                index=None
+            answers.append(
+                st.radio("Choose an answer:", item["options"], key=f"quiz_{version}_{i}", index=None)
             )
-
-            answers.append(selected)
             st.divider()
-
         submitted = st.form_submit_button("Submit Quiz")
 
     if submitted:
-
         score = 0
-
         for i, item in enumerate(questions):
-
             if answers[i] == item["answer"]:
                 score += 1
                 st.success(f"Q{i + 1}: Correct!")
             else:
-                st.error(
-                    f"Q{i + 1}: Correct answer: {item['answer']}"
-                )
-
+                st.error(f"Q{i + 1}: Correct answer: {item['answer']}")
             st.caption(item["explanation"])
-
         st.metric("Your Score", f"{score} / {len(questions)}")
 
     if st.button("🔄 New Quiz"):
-        st.session_state.quiz_questions = random.sample(
-            QUIZ, len(QUIZ)
-        )
+        new_quiz()
         st.rerun()
 
-# ==================================================
-# 15. STUDY PLANNER
-# ==================================================
 
-def planner_page():
-
+def planner_page() -> None:
     st.title("📅 Study Planner")
+    tasks = load_items(PLANNER_FILE)
 
-    tasks = load_json(PLANNER_FILE, [])
+    with st.form("task_form", clear_on_submit=True):
+        task_name = st.text_input("Study Task")
+        task_subject = st.selectbox("Task Subject", SUBJECTS)
+        task_date = st.date_input("Study Date", date.today())
+        submitted = st.form_submit_button("➕ Add Study Task")
 
-    task_name = st.text_input("Study Task")
-    task_subject = st.selectbox(
-        "Task Subject",
-        SUBJECTS,
-        key="planner_subject"
-    )
-    task_date = st.date_input("Study Date", date.today())
-
-    if st.button("Add Study Task"):
-
+    if submitted:
         if task_name.strip():
-
-            tasks.append({
-                "task": task_name.strip(),
-                "subject": task_subject,
-                "date": str(task_date),
-                "completed": False
-            })
-
+            tasks.append(
+                {
+                    "id": uuid.uuid4().hex,
+                    "task": task_name.strip(),
+                    "subject": task_subject,
+                    "date": str(task_date),
+                    "completed": False,
+                }
+            )
             save_json(PLANNER_FILE, tasks)
             st.success("Study task added.")
             st.rerun()
-
         else:
             st.warning("Enter a task name.")
 
     st.divider()
-    st.subheader("Your Study Tasks")
+    done_count = sum(1 for t in tasks if t.get("completed"))
+    m1, m2 = st.columns(2)
+    m1.metric("Pending", len(tasks) - done_count)
+    m2.metric("Completed", done_count)
 
+    st.subheader("Your Study Tasks")
     if not tasks:
         st.info("No study tasks yet.")
 
-    for i, task in enumerate(tasks):
+    today = date.today().isoformat()
+    for task in sorted(tasks, key=lambda t: (t.get("completed", False), t["date"])):
+        completed = task.get("completed", False)
+        overdue = (not completed) and task["date"] < today
+        label = f"**{task['task']}** — {task['subject']} — {task['date']}"
+        if overdue:
+            label += "  ⚠️ *overdue*"
 
-        st.write(
-            f"**{task['task']}** — {task['subject']} — {task['date']}"
-        )
+        c1, c2, c3 = st.columns([6, 1.5, 1.5])
+        if completed:
+            c1.markdown(f'<span class="done">✅ {label}</span>', unsafe_allow_html=True)
+        else:
+            c1.markdown(label)
 
-        col1, col2 = st.columns(2)
+        if c2.button("Undo" if completed else "Complete", key=f"toggle_{task['id']}"):
+            task["completed"] = not completed
+            save_json(PLANNER_FILE, tasks)
+            st.rerun()
+        if c3.button("Delete", key=f"del_task_{task['id']}"):
+            save_json(PLANNER_FILE, [t for t in tasks if t["id"] != task["id"]])
+            st.rerun()
 
-        with col1:
-            if st.button("Complete", key=f"complete_{i}"):
-                tasks.pop(i)
-                save_json(PLANNER_FILE, tasks)
-                st.rerun()
 
-        with col2:
-            if st.button("Delete", key=f"delete_{i}"):
-                tasks.pop(i)
-                save_json(PLANNER_FILE, tasks)
-                st.rerun()
-
-        st.divider()
-
-# ==================================================
-# 16. KNOWLEDGE BASE PAGE
-# ==================================================
-
-def knowledge_page():
-
+def knowledge_page() -> None:
     st.title("📚 School Knowledge Base")
 
-    search = st.text_input("Search a question or topic")
+    col1, col2 = st.columns([2, 1])
+    search = col1.text_input("Search a question or topic").lower().strip()
+    subject_filter = col2.selectbox("Subject", ["All"] + SUBJECTS)
 
-    for question, item in KNOWLEDGE.items():
+    shown = 0
+    for question, (answer, subject) in KNOWLEDGE.items():
+        if subject_filter != "All" and subject != subject_filter:
+            continue
+        if search and search not in question and search not in answer.lower():
+            continue
+        shown += 1
+        with st.expander(question.title()):
+            st.write(answer)
+            st.caption(f"Subject: {subject}")
 
-        if search.lower() in question or not search:
+    if shown == 0:
+        st.info("No matching topics found.")
 
-            with st.expander(question.title()):
 
-                st.write(item["answer"])
-                st.caption(f"Subject: {item['subject']}")
-
-# ==================================================
-# 17. ABOUT PAGE
-# ==================================================
-
-def about_page():
-
+def about_page() -> None:
     st.title("ℹ️ About This Project")
+    st.markdown(
+        f"""
+## 🎓 {APP_NAME}
 
-    st.markdown(f"""
-    ## 🎓 {APP_NAME}
+A professional educational assistant for Class 1 to Class 10.
 
-    A professional offline educational demo.
+**Features**
+- Password-protected entry (password kept in secrets, not in code)
+- Chatbot in English, Urdu and Roman Urdu
+- Optional Claude AI tutor for questions outside the knowledge base
+- Calculator, study notes, quiz and study planner
+- Searchable knowledge base
 
-    **Features:**
-    - Password protected entry
-    - Class 1 to Class 10
-    - 14 school subjects
-    - Educational chatbot
-    - English, Urdu and Roman Urdu
-    - Study notes
-    - Calculator
-    - Knowledge quiz
-    - Study planner
-    - Built-in question database
-
-    **Version:** 1.0
-
-    **Developer:** Muhammad Abdullah
-    """)
-
-    st.warning(
-        "This app uses prepared offline answers. "
-        "It is not a generative AI model and cannot answer every new question."
+**Version:** 2.0  
+**Developer:** Muhammad Abdullah
+"""
+    )
+    if ai_available():
+        st.success("AI tutor: connected")
+    else:
+        st.warning(
+            "AI tutor: not connected. The chatbot uses prepared offline answers only. "
+            "Add ANTHROPIC_API_KEY to your secrets to enable AI answers."
+        )
+    st.caption(
+        "Notes and planner are stored in the local 'data' folder. On hosts with "
+        "temporary storage (such as free cloud tiers) they may reset on restart."
     )
 
+
 # ==================================================
-# 18. MAIN APPLICATION
+# 10. MAIN APPLICATION
 # ==================================================
 
-def main_app():
+PAGES = {
+    "🏠 Home": home_page,
+    "🤖 AI Chatbot": chatbot_page,
+    "🧮 Calculator": calculator_page,
+    "📝 Study Notes": notes_page,
+    "🧠 Quiz": quiz_page,
+    "📅 Study Planner": planner_page,
+    "📚 Knowledge Base": knowledge_page,
+    "ℹ️ About": about_page,
+}
 
+
+def main_app() -> None:
     st.sidebar.title("🎓 School AI")
     st.sidebar.caption("Professional Learning Dashboard")
-
     st.sidebar.success("Welcome, Muhammad Abdullah")
 
-    page = st.sidebar.radio(
-        "MAIN MENU",
-        [
-            "🏠 Home",
-            "🤖 AI Chatbot",
-            "🧮 Calculator",
-            "📝 Study Notes",
-            "🧠 Quiz",
-            "📅 Study Planner",
-            "📚 Knowledge Base",
-            "ℹ️ About"
-        ]
-    )
+    page = st.sidebar.radio("MAIN MENU", list(PAGES))
 
     st.sidebar.divider()
-
     st.sidebar.write("**Student Settings**")
+    st.sidebar.selectbox("Class", CLASSES, key="student_class")
+    st.sidebar.selectbox("Subject", SUBJECTS, key="subject")
+    st.sidebar.selectbox("Answer Language", LANGUAGES, key="language")
 
-    st.sidebar.selectbox(
-        "Class",
-        CLASSES,
-        key="sidebar_class"
-    )
+    if ai_available():
+        st.sidebar.checkbox("Use AI for unknown questions", key="use_ai")
+    else:
+        st.sidebar.caption("AI tutor: offline mode")
 
-    st.sidebar.caption("Muhammad Abdullah School AI")
-
+    st.sidebar.divider()
     if st.sidebar.button("🚪 Logout", use_container_width=True):
-
         st.session_state.authenticated = False
         st.session_state.messages = []
         st.rerun()
 
-    if page == "🏠 Home":
-        home_page()
+    PAGES[page]()
 
-    elif page == "🤖 AI Chatbot":
-        chatbot_page()
-
-    elif page == "🧮 Calculator":
-        calculator_page()
-
-    elif page == "📝 Study Notes":
-        notes_page()
-
-    elif page == "🧠 Quiz":
-        quiz_page()
-
-    elif page == "📅 Study Planner":
-        planner_page()
-
-    elif page == "📚 Knowledge Base":
-        knowledge_page()
-
-    elif page == "ℹ️ About":
-        about_page()
-
-# ==================================================
-# 19. START APPLICATION
-# ==================================================
 
 if st.session_state.authenticated:
     main_app()
