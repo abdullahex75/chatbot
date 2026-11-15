@@ -8,275 +8,488 @@ st.set_page_config(
     layout="wide"
 )
 
-# ---------------- SESSION SETTINGS ----------------
+# ==========================================
+# SETTINGS
+# ==========================================
 
-TRIAL_SECONDS = 24 * 60 * 60
+APP_PASSWORD = "Muhammad Abdullah"
+
+FREE_MESSAGE_LIMIT = 10
+
 WEEKLY_PRICE = 200
 MONTHLY_PRICE = 500
 
-if "trial_started" not in st.session_state:
-    st.session_state.trial_started = time.time()
+# ==========================================
+# SESSION STATE
+# ==========================================
 
-if "subscription_until" not in st.session_state:
-    st.session_state.subscription_until = 0
+defaults = {
+    "logged_in": False,
+    "message_count": 0,
+    "premium_until": 0,
+    "chat_history": [],
+    "selected_class": "Class 10",
+    "selected_subject": "General Knowledge"
+}
 
-now = time.time()
+for key, value in defaults.items():
+    if key not in st.session_state:
+        st.session_state[key] = value
 
-trial_active = (
-    now - st.session_state.trial_started < TRIAL_SECONDS
-)
-
-paid_active = now < st.session_state.subscription_until
-
-# ---------------- PROFESSIONAL DESIGN ----------------
+# ==========================================
+# PROFESSIONAL DESIGN
+# ==========================================
 
 st.markdown("""
 <style>
 
 .stApp {
     background:
-    radial-gradient(circle at top left, #263c78 0%, transparent 35%),
-    radial-gradient(circle at bottom right, #542d80 0%, transparent 35%),
-    linear-gradient(135deg, #080e20, #101a35 55%, #17102e);
+    radial-gradient(circle at top left, #26365F, transparent 35%),
+    linear-gradient(135deg, #080D1B, #111A33, #211438);
     color: white;
-}
-
-header, footer {
-    visibility: hidden;
 }
 
 .block-container {
     max-width: 1100px;
     padding-top: 2rem;
-    padding-bottom: 3rem;
 }
 
-.hero {
+h1, h2, h3, p, label {
+    color: white;
+}
+
+.brand {
     text-align: center;
-    padding: 35px 15px 25px 15px;
+    padding: 20px 5px;
 }
 
-.hero h1 {
-    color: #ffffff;
-    font-size: clamp(30px, 5vw, 48px);
+.brand h1 {
+    font-size: clamp(28px, 5vw, 43px);
     font-weight: 800;
-    letter-spacing: -1px;
 }
 
-.hero p {
-    color: #b9c7e8;
-    font-size: 17px;
+.brand p {
+    color: #B9C5E0;
 }
 
 .plan-card {
-    background: rgba(255,255,255,0.07);
-    border: 1px solid rgba(255,255,255,0.16);
-    border-radius: 20px;
-    padding: 26px 22px;
-    min-height: 245px;
-    backdrop-filter: blur(15px);
-    box-shadow: 0 12px 35px rgba(0,0,0,0.22);
+    background: #202B43;
+    border: 1px solid #465675;
+    border-radius: 18px;
+    padding: 22px;
+    min-height: 220px;
     margin-bottom: 12px;
 }
 
 .featured {
-    border: 2px solid #8b7bff;
-    background: linear-gradient(
-        145deg,
-        rgba(91,74,180,0.35),
-        rgba(255,255,255,0.07)
-    );
+    border: 2px solid #917BFF;
+    background: linear-gradient(145deg, #302755, #202B43);
 }
 
-.plan-name {
-    font-size: 21px;
-    font-weight: 700;
-    color: white;
-}
-
-.plan-price {
-    font-size: 36px;
+.price {
+    font-size: 34px;
     font-weight: 800;
-    color: #a99cff;
-    margin: 14px 0;
+    color: #AA98FF;
+    margin: 12px 0;
 }
 
-.plan-description {
-    color: #c2cce3;
+.small-text {
+    color: #C0CAE0;
     font-size: 14px;
 }
 
-.tag {
-    display: inline-block;
-    background: #6654cb;
+.stButton button {
+    width: 100%;
+    min-height: 45px;
+    border-radius: 12px;
+    background: linear-gradient(90deg, #6554D9, #9279F5);
     color: white;
-    border-radius: 20px;
-    padding: 5px 12px;
-    font-size: 12px;
+    border: none;
     font-weight: bold;
 }
 
-.stButton > button {
-    width: 100%;
-    border-radius: 12px;
-    min-height: 48px;
-    border: 1px solid #8175ed;
-    background: linear-gradient(90deg, #6654cb, #9276f5);
+.stButton button:hover {
     color: white;
-    font-weight: 700;
-    transition: 0.2s;
-}
-
-.stButton > button:hover {
-    border-color: white;
-    background: linear-gradient(90deg, #7968e2, #a18bff);
-    color: white;
-}
-
-.notice {
-    background: rgba(255,255,255,0.06);
-    border: 1px solid rgba(255,255,255,0.12);
-    border-radius: 14px;
-    padding: 16px;
-    color: #cbd5e1;
-    text-align: center;
-    margin-top: 22px;
+    border: 1px solid white;
 }
 
 .footer {
     text-align: center;
-    color: #8492b3;
+    color: #8492B3;
     padding: 25px;
-    font-size: 13px;
 }
 
 </style>
 """, unsafe_allow_html=True)
 
 
-# ---------------- SUBSCRIPTION SCREEN ----------------
+# ==========================================
+# PASSWORD LOGIN
+# ==========================================
 
-def show_subscription():
+def login_page():
 
     st.markdown("""
-    <div class="hero">
-        <div style="font-size:55px;">🎓</div>
+    <div class="brand">
+        <div style="font-size:55px">🎓</div>
+        <h1>Muhammad Abdullah School AI</h1>
+        <p>Your Smart Educational Assistant</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    with st.container(border=True):
+
+        st.subheader("🔐 Secure Login")
+
+        password = st.text_input(
+            "Enter School AI Password",
+            type="password"
+        )
+
+        if st.button("Login to School AI"):
+
+            if password == APP_PASSWORD:
+                st.session_state.logged_in = True
+                st.rerun()
+
+            else:
+                st.error("Incorrect password. Please try again.")
+
+        st.caption("Welcome to Muhammad Abdullah School AI")
+
+
+# ==========================================
+# SUBSCRIPTION / UPGRADE SCREEN
+# ==========================================
+
+def upgrade_screen():
+
+    st.markdown("""
+    <div class="brand">
+        <div style="font-size:55px">🎓</div>
         <h1>Muhammad Abdullah School AI</h1>
         <p>Your Smart Learning Partner</p>
-        <div class="tag">PREMIUM EDUCATION EXPERIENCE</div>
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown(
-        "<h2 style='text-align:center;color:white;'>Choose Your Plan</h2>",
-        unsafe_allow_html=True
+    st.divider()
+
+    st.markdown("## ⏳ You've reached your free usage limit")
+
+    st.write(
+        "You've used all your free messages. "
+        "Choose a plan to continue chatting."
     )
 
-    st.markdown(
-        "<p style='text-align:center;color:#b9c7e8;'>"
-        "Select an access plan to continue learning."
-        "</p>",
-        unsafe_allow_html=True
-    )
-
-    col1, col2, col3 = st.columns(3, gap="medium")
+    col1, col2 = st.columns(2, gap="large")
 
     with col1:
+
         st.markdown("""
         <div class="plan-card">
-            <div class="plan-name">🎁 Free Trial</div>
-            <div class="plan-price">Rs. 0</div>
-            <div class="plan-description">
-                • 1 Day Access<br><br>
-                • Explore the chatbot<br><br>
-                • Try learning features
+            <h3>📅 Weekly Plan</h3>
+            <div class="price">Rs. 200</div>
+            <div class="small-text">
+                ✓ 7 Days Access<br><br>
+                ✓ School AI Chatbot<br><br>
+                ✓ Educational Support
             </div>
         </div>
         """, unsafe_allow_html=True)
 
-        if st.button("Start Free Trial", key="trial"):
-            st.session_state.trial_started = time.time()
-            st.rerun()
+        if st.button("Choose Weekly Plan - Rs. 200"):
+
+            st.session_state.selected_plan = "weekly"
+
+            st.info(
+                "Weekly plan selected. "
+                "Payment gateway is not connected yet."
+            )
 
     with col2:
-        st.markdown("""
-        <div class="plan-card">
-            <div class="plan-name">📅 Weekly Plan</div>
-            <div class="plan-price">Rs. 200</div>
-            <div class="plan-description">
-                • 7 Days Access<br><br>
-                • School AI Assistant<br><br>
-                • Learning support
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
 
-        if st.button("Select Weekly Plan", key="weekly"):
-            st.session_state.selected_plan = "weekly"
-            st.info("Payment setup is required before activation.")
-
-    with col3:
         st.markdown("""
         <div class="plan-card featured">
-            <div class="tag">POPULAR PLAN</div>
-            <div class="plan-name">⭐ Monthly Plan</div>
-            <div class="plan-price">Rs. 500</div>
-            <div class="plan-description">
-                • 30 Days Access<br><br>
-                • School AI Assistant<br><br>
-                • Learning support
+            <div style="color:#B6A5FF;font-weight:bold">
+                ⭐ POPULAR PLAN
+            </div>
+            <h3>Monthly Plan</h3>
+            <div class="price">Rs. 500</div>
+            <div class="small-text">
+                ✓ 30 Days Access<br><br>
+                ✓ School AI Chatbot<br><br>
+                ✓ Educational Support
             </div>
         </div>
         """, unsafe_allow_html=True)
 
-        if st.button("Select Monthly Plan", key="monthly"):
+        if st.button("Choose Monthly Plan - Rs. 500"):
+
             st.session_state.selected_plan = "monthly"
-            st.info("Payment setup is required before activation.")
 
-    st.markdown("""
-    <div class="notice">
-        🔒 Secure access • Smart learning • Student-friendly experience
-        <br><br>
-        Payment activation will be available after a verified payment
-        gateway is connected.
-    </div>
+            st.info(
+                "Monthly plan selected. "
+                "Payment gateway is not connected yet."
+            )
 
-    <div class="footer">
-        © 2026 Muhammad Abdullah School AI
-        <br>
-        Designed for smarter learning.
-    </div>
-    """, unsafe_allow_html=True)
-
-
-# ---------------- ACCESS CONTROL ----------------
-
-if paid_active:
-
-    st.success("Your subscription is active!")
-
-elif trial_active:
-
-    remaining = int(
-        TRIAL_SECONDS - (now - st.session_state.trial_started)
+    st.info(
+        "🔒 Premium activation requires verified payment."
     )
 
-    hours = remaining // 3600
-    minutes = (remaining % 3600) // 60
+    st.markdown(
+        '<div class="footer">© 2026 Muhammad Abdullah School AI</div>',
+        unsafe_allow_html=True
+    )
+
+
+# ==========================================
+# OFFLINE SCHOOL KNOWLEDGE BASE
+# ==========================================
+
+knowledge = {
+
+    "General Knowledge": {
+        "what is computer":
+            "A computer is an electronic machine that processes data.",
+
+        "what is pakistan":
+            "Pakistan is a country in South Asia. Its capital is Islamabad.",
+
+        "who is the founder of pakistan":
+            "Quaid-e-Azam Muhammad Ali Jinnah is the founder of Pakistan.",
+
+        "what is science":
+            "Science is the systematic study of the natural world.",
+
+        "what is education":
+            "Education is the process of gaining knowledge and skills."
+    },
+
+    "Mathematics": {
+        "what is mathematics":
+            "Mathematics is the study of numbers, shapes and patterns.",
+
+        "what is addition":
+            "Addition means combining two or more numbers.",
+
+        "what is subtraction":
+            "Subtraction means taking one number away from another.",
+
+        "what is multiplication":
+            "Multiplication is repeated addition.",
+
+        "what is division":
+            "Division means sharing a quantity into equal parts."
+    },
+
+    "English": {
+        "what is noun":
+            "A noun is the name of a person, place, animal or thing.",
+
+        "what is verb":
+            "A verb is an action or state word.",
+
+        "what is adjective":
+            "An adjective describes a noun.",
+
+        "what is sentence":
+            "A sentence is a group of words expressing a complete idea."
+    },
+
+    "Computer Science": {
+        "what is internet":
+            "The internet is a global network connecting computers.",
+
+        "what is website":
+            "A website is a collection of related web pages.",
+
+        "what is python":
+            "Python is a popular programming language.",
+
+        "what is software":
+            "Software is a set of instructions used by a computer."
+    },
+
+    "Biology": {
+        "what is cell":
+            "The cell is the basic structural and functional unit of life.",
+
+        "what is photosynthesis":
+            "Photosynthesis is the process by which green plants make food using sunlight.",
+
+        "what is heart":
+            "The heart is an organ that pumps blood around the body."
+    },
+
+    "Physics": {
+        "what is force":
+            "Force is a push or pull that can change an object's motion.",
+
+        "what is energy":
+            "Energy is the ability to do work.",
+
+        "what is gravity":
+            "Gravity is the force of attraction between objects with mass."
+    },
+
+    "Chemistry": {
+        "what is atom":
+            "An atom is the basic unit of an element.",
+
+        "what is water":
+            "Water is a chemical compound with the formula H2O.",
+
+        "what is element":
+            "An element is a pure substance made of one type of atom."
+    }
+}
+
+
+def get_answer(question, subject):
+
+    q = question.lower().strip()
+
+    if subject in knowledge:
+
+        for key, answer in knowledge[subject].items():
+
+            if key in q or q in key:
+                return answer
+
+    for subject_data in knowledge.values():
+
+        for key, answer in subject_data.items():
+
+            if key in q or q in key:
+                return answer
+
+    return (
+        "I don't have this answer in my offline knowledge base yet. "
+        "Please try another question or ask your teacher."
+    )
+
+
+# ==========================================
+# SCHOOL AI CHATBOT
+# ==========================================
+
+def school_ai():
 
     st.markdown("""
-    <div class="hero">
+    <div class="brand">
         <h1>🎓 Muhammad Abdullah School AI</h1>
-        <p>Your free learning trial is active!</p>
+        <p>Smart Education • Smart Learning • Smart Future</p>
     </div>
     """, unsafe_allow_html=True)
 
-    st.success("🎉 Your 1-day free trial is active!")
-    st.info(f"⏳ Time remaining: {hours} hours and {minutes} minutes")
+    # Sidebar
+    with st.sidebar:
 
-    st.markdown("### Your AI School Assistant")
-    st.write("Paste your existing chatbot interface code below this section.")
+        st.title("🎓 School AI")
+
+        st.write("Student Dashboard")
+
+        st.selectbox(
+            "Select Class",
+            [f"Class {i}" for i in range(1, 11)],
+            key="selected_class"
+        )
+
+        st.selectbox(
+            "Select Subject",
+            list(knowledge.keys()),
+            key="selected_subject"
+        )
+
+        st.divider()
+
+        st.write("📊 Account Usage")
+
+        if not st.session_state.premium_until:
+            remaining = max(
+                0,
+                FREE_MESSAGE_LIMIT - st.session_state.message_count
+            )
+
+            st.progress(
+                min(1.0, remaining / FREE_MESSAGE_LIMIT)
+            )
+
+            st.caption(
+                f"{remaining} free messages remaining"
+            )
+        else:
+            st.success("Premium Account")
+
+        if st.button("Logout"):
+            st.session_state.logged_in = False
+            st.rerun()
+
+    st.subheader("💬 AI School Assistant")
+
+    st.caption(
+        f"{st.session_state.selected_class} | "
+        f"{st.session_state.selected_subject}"
+    )
+
+    # Chat history
+    for msg in st.session_state.chat_history:
+
+        with st.chat_message(msg["role"]):
+            st.write(msg["content"])
+
+    question = st.chat_input("Ask your school question...")
+
+    if question:
+
+        st.session_state.chat_history.append({
+            "role": "user",
+            "content": question
+        })
+
+        answer = get_answer(
+            question,
+            st.session_state.selected_subject
+        )
+
+        st.session_state.chat_history.append({
+            "role": "assistant",
+            "content": answer
+        })
+
+        if not st.session_state.premium_until:
+            st.session_state.message_count += 1
+
+        st.rerun()
+
+    st.divider()
+
+    st.caption(
+        "Muhammad Abdullah School AI | Offline Educational Demo"
+    )
+
+
+# ==========================================
+# MAIN APP CONTROL
+# ==========================================
+
+if not st.session_state.logged_in:
+
+    login_page()
+
+elif (
+    st.session_state.premium_until > time.time()
+):
+
+    school_ai()
+
+elif (
+    st.session_state.message_count >= FREE_MESSAGE_LIMIT
+):
+
+    upgrade_screen()
 
 else:
-    show_subscription()
-    st.stop()
+
+    school_ai()
