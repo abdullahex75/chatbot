@@ -1,861 +1,282 @@
-"""
-Muhammad Abdullah School AI
----------------------------
-A Streamlit learning assistant for Class 1-10 students.
-
-Features: password login, offline knowledge-base chatbot (English / Urdu /
-Roman Urdu), optional Claude AI for unknown questions, calculator, notes,
-quiz and study planner.
-
-Run:  streamlit run app.py
-"""
-
-from __future__ import annotations
-
-import ast
-import difflib
-import hmac
-import html
-import json
-import operator
-import os
-import random
-import re
-import uuid
-from datetime import date, datetime
-from pathlib import Path
 
 import streamlit as st
-
-try:  # Optional: only needed for AI mode
-    import anthropic
-except ImportError:  # pragma: no cover
-    anthropic = None
-
-# ==================================================
-# 1. APP CONFIGURATION
-# ==================================================
+import time
 
 st.set_page_config(
-    page_title="School AI",
+    page_title="Muhammad Abdullah School AI",
     page_icon="🎓",
-    layout="wide",
-    initial_sidebar_state="expanded",
+    layout="wide"
 )
 
-APP_NAME = "Muhammad Abdullah School AI"
-APP_PASSWORD = "CES Abdullah"  # default password (secrets.toml can override it)
-MAX_LOGIN_ATTEMPTS = 5
+# ---------------- SESSION SETTINGS ----------------
 
-DATA_DIR = Path(os.getenv("SCHOOL_AI_DATA_DIR", "data"))
-DATA_DIR.mkdir(parents=True, exist_ok=True)
-NOTES_FILE = DATA_DIR / "school_ai_notes.json"
-PLANNER_FILE = DATA_DIR / "school_ai_planner.json"
+TRIAL_SECONDS = 24 * 60 * 60
+WEEKLY_PRICE = 200
+MONTHLY_PRICE = 500
 
-CLASSES = [f"Class {i}" for i in range(1, 11)]
-SUBJECTS = [
-    "Mathematics", "English", "Urdu", "Physics", "Chemistry", "Biology",
-    "Computer Science", "General Science", "Islamiat", "Pakistan Studies",
-    "History", "Geography", "General Knowledge", "Other",
-]
-LANGUAGES = ["Simple English", "Urdu", "Roman Urdu"]
+if "trial_started" not in st.session_state:
+    st.session_state.trial_started = time.time()
 
+if "subscription_until" not in st.session_state:
+    st.session_state.subscription_until = 0
 
-def get_secret(name: str, default: str | None = None) -> str | None:
-    """Read a value from Streamlit secrets, then environment variables."""
-    try:
-        if name in st.secrets:
-            return str(st.secrets[name])
-    except Exception:
-        pass
-    return os.getenv(name, default)
+now = time.time()
 
+trial_active = (
+    now - st.session_state.trial_started < TRIAL_SECONDS
+)
 
-AI_MODEL = get_secret("CHATBOT_MODEL", "claude-sonnet-5-5")
+paid_active = now < st.session_state.subscription_until
 
+# ---------------- PROFESSIONAL DESIGN ----------------
 
-def ai_available() -> bool:
-    return anthropic is not None and bool(get_secret("ANTHROPIC_API_KEY"))
-
-
-# ==================================================
-# 2. SESSION STATE
-# ==================================================
-
-DEFAULTS = {
-    "authenticated": False,
-    "attempts": 0,
-    "messages": [],
-    "student_class": "Class 10",
-    "subject": "Mathematics",
-    "language": "Simple English",
-    "use_ai": True,
-    "quiz_version": 0,
-}
-for _key, _value in DEFAULTS.items():
-    if _key not in st.session_state:
-        st.session_state[_key] = _value
-
-# ==================================================
-# 3. STYLING
-# ==================================================
-
-st.markdown(
-    """
+st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu&display=swap');
 
-.stApp { background: linear-gradient(135deg, #071426, #102d50); color: #ffffff; }
-[data-testid="stSidebar"] { background: #081a30; }
+.stApp {
+    background:
+    radial-gradient(circle at top left, #263c78 0%, transparent 35%),
+    radial-gradient(circle at bottom right, #542d80 0%, transparent 35%),
+    linear-gradient(135deg, #080e20, #101a35 55%, #17102e);
+    color: white;
+}
 
-.main-title { text-align: center; font-size: 36px; font-weight: 900; color: #55c7ff; }
-.subtitle { text-align: center; color: #c4d9ee; font-size: 16px; }
+header, footer {
+    visibility: hidden;
+}
 
-.panel {
-    background: rgba(22, 55, 88, 0.75);
-    border: 1px solid #28547c;
-    border-radius: 15px;
-    padding: 18px;
+.block-container {
+    max-width: 1100px;
+    padding-top: 2rem;
+    padding-bottom: 3rem;
+}
+
+.hero {
+    text-align: center;
+    padding: 35px 15px 25px 15px;
+}
+
+.hero h1 {
+    color: #ffffff;
+    font-size: clamp(30px, 5vw, 48px);
+    font-weight: 800;
+    letter-spacing: -1px;
+}
+
+.hero p {
+    color: #b9c7e8;
+    font-size: 17px;
+}
+
+.plan-card {
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.16);
+    border-radius: 20px;
+    padding: 26px 22px;
+    min-height: 245px;
+    backdrop-filter: blur(15px);
+    box-shadow: 0 12px 35px rgba(0,0,0,0.22);
     margin-bottom: 12px;
 }
 
-div.stButton > button, div.stFormSubmitButton > button {
-    background: #078bd5; color: white; border: none;
-    border-radius: 10px; font-weight: bold; min-height: 42px;
-}
-div.stButton > button:hover, div.stFormSubmitButton > button:hover {
-    background: #0069a8; color: white;
+.featured {
+    border: 2px solid #8b7bff;
+    background: linear-gradient(
+        145deg,
+        rgba(91,74,180,0.35),
+        rgba(255,255,255,0.07)
+    );
 }
 
-h1, h2, h3 { color: #67caff; }
-
-.rtl {
-    direction: rtl; text-align: right;
-    font-family: 'Noto Nastaliq Urdu', 'Jameel Noori Nastaleeq', serif;
-    line-height: 2.1;
+.plan-name {
+    font-size: 21px;
+    font-weight: 700;
+    color: white;
 }
-.done { text-decoration: line-through; opacity: 0.6; }
+
+.plan-price {
+    font-size: 36px;
+    font-weight: 800;
+    color: #a99cff;
+    margin: 14px 0;
+}
+
+.plan-description {
+    color: #c2cce3;
+    font-size: 14px;
+}
+
+.tag {
+    display: inline-block;
+    background: #6654cb;
+    color: white;
+    border-radius: 20px;
+    padding: 5px 12px;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.stButton > button {
+    width: 100%;
+    border-radius: 12px;
+    min-height: 48px;
+    border: 1px solid #8175ed;
+    background: linear-gradient(90deg, #6654cb, #9276f5);
+    color: white;
+    font-weight: 700;
+    transition: 0.2s;
+}
+
+.stButton > button:hover {
+    border-color: white;
+    background: linear-gradient(90deg, #7968e2, #a18bff);
+    color: white;
+}
+
+.notice {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 14px;
+    padding: 16px;
+    color: #cbd5e1;
+    text-align: center;
+    margin-top: 22px;
+}
+
+.footer {
+    text-align: center;
+    color: #8492b3;
+    padding: 25px;
+    font-size: 13px;
+}
+
 </style>
-""",
-    unsafe_allow_html=True,
-)
+""", unsafe_allow_html=True)
 
-# ==================================================
-# 4. STORAGE HELPERS
-# ==================================================
 
+# ---------------- SUBSCRIPTION SCREEN ----------------
 
-def load_json(path: Path, default):
-    if not path.exists():
-        return default
-    try:
-        with path.open("r", encoding="utf-8") as f:
-            return json.load(f)
-    except (json.JSONDecodeError, OSError):
-        return default
+def show_subscription():
 
+    st.markdown("""
+    <div class="hero">
+        <div style="font-size:55px;">🎓</div>
+        <h1>Muhammad Abdullah School AI</h1>
+        <p>Your Smart Learning Partner</p>
+        <div class="tag">PREMIUM EDUCATION EXPERIENCE</div>
+    </div>
+    """, unsafe_allow_html=True)
 
-def save_json(path: Path, data) -> None:
-    tmp = path.with_suffix(".tmp")
-    with tmp.open("w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=4)
-    tmp.replace(path)  # atomic write
-
-
-def load_items(path: Path) -> list[dict]:
-    """Load a list of records and make sure each has a unique id."""
-    items = load_json(path, [])
-    if not isinstance(items, list):
-        return []
-    changed = False
-    for item in items:
-        if "id" not in item:
-            item["id"] = uuid.uuid4().hex
-            changed = True
-    if changed:
-        save_json(path, items)
-    return items
-
-
-# ==================================================
-# 5. KNOWLEDGE BASE  (answer, subject)
-# ==================================================
-
-KNOWLEDGE: dict[str, tuple[str, str]] = {
-    # ---- Computer Science
-    "what is computer": ("A computer is an electronic device that accepts data, processes it, stores it and produces information.", "Computer Science"),
-    "what is ai": ("Artificial Intelligence (AI) is a branch of computer science that develops systems able to perform tasks such as recognizing patterns, understanding language and solving problems.", "Computer Science"),
-    "what is internet": ("The Internet is a worldwide network of connected computers and devices that exchange information.", "Computer Science"),
-    "what is website": ("A website is a collection of connected web pages that people can access through a web browser.", "Computer Science"),
-    "what is python": ("Python is a high-level programming language known for readable syntax. It is used in automation, data science, websites and AI.", "Computer Science"),
-    "what is algorithm": ("An algorithm is a step-by-step procedure for solving a problem or completing a task.", "Computer Science"),
-    "what is hardware": ("Hardware means the physical parts of a computer, such as the keyboard, mouse, monitor and processor.", "Computer Science"),
-    "what is software": ("Software is a set of programs and instructions that tell a computer what to do.", "Computer Science"),
-    "what is cpu": ("CPU stands for Central Processing Unit. It executes instructions and performs calculations in a computer.", "Computer Science"),
-    "what is ram": ("RAM stands for Random Access Memory. It temporarily stores data that the computer is currently using.", "Computer Science"),
-    # ---- Biology
-    "what is photosynthesis": ("Photosynthesis is the process by which green plants use sunlight, water and carbon dioxide to make glucose and release oxygen.", "Biology"),
-    "what is cell": ("A cell is the basic structural and functional unit of life. All living organisms are made of one or more cells.", "Biology"),
-    "what is nucleus": ("The nucleus is a cell organelle that contains genetic material and helps control cell activities.", "Biology"),
-    "what is dna": ("DNA stands for Deoxyribonucleic Acid. It carries genetic information in living organisms.", "Biology"),
-    "what is ecosystem": ("An ecosystem includes living organisms and the non-living environment interacting with one another.", "Biology"),
-    "what is respiration": ("Respiration is the process by which cells release energy from food molecules.", "Biology"),
-    # ---- Chemistry
-    "what is atom": ("An atom is the smallest unit of an element that retains the chemical properties of that element.", "Chemistry"),
-    "what is molecule": ("A molecule consists of two or more atoms chemically bonded together.", "Chemistry"),
-    "what is element": ("An element is a pure substance made up of atoms that have the same number of protons.", "Chemistry"),
-    "what is compound": ("A compound is a pure substance formed when two or more different elements chemically combine in fixed proportions.", "Chemistry"),
-    "what is acid": ("An acid is a substance that donates hydrogen ions in an aqueous solution. Many common acids have a pH below 7.", "Chemistry"),
-    # ---- Physics
-    "what is gravity": ("Gravity is the attractive force between objects that have mass. Earth's gravity pulls objects toward its centre.", "Physics"),
-    "what is force": ("Force is a push or pull that can change an object's motion or shape. Its SI unit is the newton.", "Physics"),
-    "what is energy": ("Energy is the capacity to do work or cause change. Common forms include kinetic, potential, thermal and electrical energy.", "Physics"),
-    "what is speed": ("Speed is the distance travelled per unit of time. Formula: Speed = Distance / Time.", "Physics"),
-    "what is electricity": ("Electricity involves electric charges and their movement. It is used to power many everyday devices.", "Physics"),
-    # ---- Mathematics
-    "what is mathematics": ("Mathematics is the study of numbers, quantities, shapes, patterns and logical relationships.", "Mathematics"),
-    "what is algebra": ("Algebra is a branch of mathematics that uses letters and symbols to represent unknown values.", "Mathematics"),
-    "what is geometry": ("Geometry is the branch of mathematics that studies points, lines, angles, shapes and space.", "Mathematics"),
-    "what is percentage": ("A percentage is a number expressed as a fraction of 100. For example, 25% means 25 out of 100.", "Mathematics"),
-    # ---- English
-    "what is english": ("English is a language used for communication, education, literature and international exchange.", "English"),
-    "what is noun": ("A noun is a word used to name a person, place, thing or idea. Examples include teacher, school, book and honesty.", "English"),
-    "what is verb": ("A verb is a word that expresses an action or a state of being. Examples include run, write, think and is.", "English"),
-    "what is adjective": ("An adjective describes a noun or pronoun. Examples include beautiful, tall, clever and blue.", "English"),
-    # ---- Pakistan Studies / History / Geography
-    "what is pakistan": ("Pakistan is a country in South Asia. It became independent on 14 August 1947.", "Pakistan Studies"),
-    "who founded pakistan": ("Muhammad Ali Jinnah is widely known as the founder of Pakistan and its first Governor-General.", "Pakistan Studies"),
-    "when pakistan became independent": ("Pakistan became independent on 14 August 1947.", "Pakistan Studies"),
-    "what is democracy": ("Democracy is a system of government in which people participate in choosing their representatives.", "History"),
-    "what is geography": ("Geography is the study of Earth, its physical features, people, places and environments.", "Geography"),
-    "what is history": ("History is the study of past events and human societies using evidence and historical sources.", "History"),
-    # ---- General Science
-    "what is water": ("Water is a substance essential for life. A water molecule contains two hydrogen atoms and one oxygen atom: H2O.", "General Science"),
-    "what is environment": ("The environment includes the surroundings, conditions and natural systems in which living organisms exist.", "General Science"),
-    # ---- Islamiat
-    "what is islam": ("Islam is a monotheistic religion. Muslims believe in one God, Allah, and follow the teachings of the Quran and Prophet Muhammad (peace be upon him).", "Islamiat"),
-    "what is zakat": ("Zakat is an obligatory form of charity in Islam for eligible Muslims who meet the required conditions.", "Islamiat"),
-    "what is ramadan": ("Ramadan is the ninth month of the Islamic lunar calendar. Muslims who are able observe fasting during this month.", "Islamiat"),
-}
-
-URDU_ANSWERS = {
-    "what is computer": "کمپیوٹر ایک الیکٹرانک مشین ہے جو ڈیٹا وصول کرتی ہے، اسے پراسیس کرتی ہے، محفوظ کرتی ہے اور معلومات فراہم کرتی ہے۔",
-    "what is ai": "مصنوعی ذہانت (AI) کمپیوٹر سائنس کی ایک شاخ ہے جو مشینوں کو مختلف ذہین کام کرنے کے قابل بناتی ہے۔",
-    "what is internet": "انٹرنیٹ دنیا بھر کے کمپیوٹرز اور آلات کا ایک نیٹ ورک ہے جو معلومات کا تبادلہ کرتا ہے۔",
-    "what is photosynthesis": "ضیائی تالیف وہ عمل ہے جس میں سبز پودے سورج کی روشنی، پانی اور کاربن ڈائی آکسائیڈ کی مدد سے خوراک بناتے ہیں۔",
-    "what is cell": "خلیہ زندگی کی بنیادی ساختی اور فعلی اکائی ہے۔ تمام جاندار ایک یا زیادہ خلیوں سے بنے ہوتے ہیں۔",
-    "what is gravity": "کششِ ثقل وہ قوت ہے جو اجسام کو ایک دوسرے کی طرف کھینچتی ہے۔ زمین کی کشش ہمیں زمین پر رکھتی ہے۔",
-    "what is pakistan": "پاکستان جنوبی ایشیا کا ایک ملک ہے۔ پاکستان 14 اگست 1947 کو آزاد ہوا۔",
-    "what is force": "قوت کسی چیز کو دھکا دینے یا کھینچنے کا عمل ہے۔ قوت کی SI اکائی نیوٹن ہے۔",
-    "what is water": "پانی زندگی کے لیے ضروری ہے۔ اس کا کیمیائی فارمولا H2O ہے۔",
-}
-
-GREETINGS = {"hello", "hi", "hey", "salam", "assalamualaikum", "assalam"}
-
-# ==================================================
-# 6. CHATBOT ENGINE
-# ==================================================
-
-
-def normalize(question: str) -> str:
-    """Lower-case, strip punctuation and rewrite 'define X' as 'what is X'."""
-    q = question.lower().strip()
-    q = re.sub(r"[^\w\s']", " ", q)
-    q = re.sub(r"\s+", " ", q).strip()
-    q = q.replace("what's", "what is").replace("whats", "what is")
-    q = re.sub(
-        r"^(define|explain|describe|meaning of|tell me about|what are|what do you mean by)\s+",
-        "what is ",
-        q,
-    )
-    q = re.sub(r"^what is (an?|the) ", "what is ", q)
-    return q
-
-
-def find_in_knowledge(question: str) -> str | None:
-    """Return the matching knowledge-base key, or None."""
-    nq = normalize(question)
-    if nq in KNOWLEDGE:
-        return nq
-
-    # Whole-phrase match (word boundaries, so 'air' never matches 'ai').
-    for key in KNOWLEDGE:
-        if re.search(rf"\b{re.escape(key)}\b", nq):
-            return key
-
-    # Typo tolerance for longer topics only (acronyms need exact matches).
-    topic = nq.removeprefix("what is ")
-    best_key, best_score = None, 0.0
-    if len(topic) >= 5:
-        for key in KNOWLEDGE:
-            candidate = key.removeprefix("what is ")
-            if len(candidate) < 5:
-                continue
-            score = difflib.SequenceMatcher(None, topic, candidate).ratio()
-            if score > best_score:
-                best_key, best_score = key, score
-    return best_key if best_score >= 0.85 else None
-
-
-def ask_ai(question, subject, language, student_class, history) -> str | None:
-    """Ask Claude. Returns None if AI is unavailable or the call fails."""
-    if not ai_available():
-        return None
-
-    system = (
-        "You are a friendly, accurate school tutor for students in Pakistan. "
-        f"The student is in {student_class} and is studying {subject}. "
-        f"Answer in {language}. Keep answers clear, correct, age-appropriate "
-        "and reasonably short, with a simple example when helpful. "
-        "If a request is unsafe or not educational, politely redirect to studying."
-    )
-    messages = [
-        {"role": m["role"], "content": m["content"]}
-        for m in history[-10:]
-        if m["role"] in ("user", "assistant")
-    ]
-    while messages and messages[0]["role"] != "user":
-        messages.pop(0)
-    messages.append({"role": "user", "content": question})
-
-    try:
-        client = anthropic.Anthropic(api_key=get_secret("ANTHROPIC_API_KEY"))
-        response = client.messages.create(
-            model=AI_MODEL,
-            max_tokens=800,
-            system=system,
-            messages=messages,
-        )
-        return "".join(b.text for b in response.content if b.type == "text").strip()
-    except Exception:
-        return None
-
-
-def chatbot(question, subject, language, student_class, history) -> tuple[str, str]:
-    """Return (answer, source)."""
-    q = normalize(question)
-    if not q:
-        return "Please enter a question.", "System"
-
-    words = q.split()
-    if words and words[0] in GREETINGS and len(words) <= 3:
-        if language == "Urdu":
-            return "السلام علیکم! میں آپ کا School AI Assistant ہوں۔ اپنا سوال پوچھیں۔", "System"
-        if language == "Roman Urdu":
-            return "Assalamualaikum! Main aap ka School AI Assistant hoon. Apna sawal poochain.", "System"
-        return "Hello! Welcome to Muhammad Abdullah School AI. What would you like to learn today?", "System"
-
-    key = find_in_knowledge(question)
-    if key:
-        answer, topic_subject = KNOWLEDGE[key]
-        if language == "Urdu":
-            return URDU_ANSWERS.get(key, answer), "Knowledge base"
-        if language == "Roman Urdu":
-            return "Jawab: " + answer, "Knowledge base"
-        return (
-            f"**Answer:** {answer}  \n"
-            f"**Subject:** {topic_subject}  \n"
-            f"**Class:** {student_class}",
-            "Knowledge base",
-        )
-
-    if any(w in q for w in ("calculate", "solve", "plus", "minus", "multiply")):
-        return (
-            "I can help with basic calculations. Open the **Calculator** page "
-            "and enter a mathematical expression.",
-            "System",
-        )
-
-    if st.session_state.use_ai:
-        ai_answer = ask_ai(question, subject, language, student_class, history)
-        if ai_answer:
-            return ai_answer, "AI tutor"
-
-    if language == "Urdu":
-        return (
-            f"آپ کا سوال {subject} کے بارے میں موصول ہوا ہے۔ اس سوال کا تیار شدہ جواب "
-            "موجود نہیں۔ براہ کرم سوال کو آسان الفاظ میں لکھیں۔",
-            "System",
-        )
-    if language == "Roman Urdu":
-        return (
-            f"Aap ka sawal {subject} ke bare mein hai. Is sawal ka tayyar jawab mojood nahi. "
-            "Meherbani karke sawal asaan alfaaz mein likhein.",
-            "System",
-        )
-    return (
-        f"I received your question about **{subject}** for **{student_class}**, "
-        "but I do not have a prepared answer for it. Try different words, or "
-        "choose a related topic.",
-        "System",
-    )
-
-
-# ==================================================
-# 7. SAFE CALCULATOR
-# ==================================================
-
-BINARY_OPS = {
-    ast.Add: operator.add,
-    ast.Sub: operator.sub,
-    ast.Mult: operator.mul,
-    ast.Div: operator.truediv,
-    ast.Pow: operator.pow,
-    ast.Mod: operator.mod,
-}
-UNARY_OPS = {ast.USub: operator.neg, ast.UAdd: operator.pos}
-
-
-def safe_calculate(expression: str):
-    expression = (
-        expression.replace("^", "**").replace("×", "*").replace("÷", "/").strip()
-    )
-    if not expression or len(expression) > 100:
-        raise ValueError("Invalid expression")
-
-    def evaluate(node):
-        if isinstance(node, ast.Expression):
-            return evaluate(node.body)
-        if isinstance(node, ast.Constant) and type(node.value) in (int, float):
-            return node.value
-        if isinstance(node, ast.BinOp) and type(node.op) in BINARY_OPS:
-            left, right = evaluate(node.left), evaluate(node.right)
-            if isinstance(node.op, ast.Pow) and abs(right) > 10:
-                raise ValueError("Exponent too large")
-            result = BINARY_OPS[type(node.op)](left, right)
-            if abs(result) > 10**12:
-                raise ValueError("Result too large")
-            return result
-        if isinstance(node, ast.UnaryOp) and type(node.op) in UNARY_OPS:
-            return UNARY_OPS[type(node.op)](evaluate(node.operand))
-        raise ValueError("Invalid expression")
-
-    result = evaluate(ast.parse(expression, mode="eval"))
-    if isinstance(result, float):
-        result = int(result) if result.is_integer() else round(result, 10)
-    return result
-
-
-# ==================================================
-# 8. LOGIN
-# ==================================================
-
-
-def login_screen() -> None:
-    st.markdown(f'<div class="main-title">🎓 {APP_NAME}</div>', unsafe_allow_html=True)
-    st.markdown('<div class="subtitle">Your Professional Learning Assistant</div>', unsafe_allow_html=True)
-    st.write("")
-
-    _, center, _ = st.columns([1, 1.3, 1])
-    with center:
-        expected = get_secret("APP_PASSWORD", APP_PASSWORD)
-
-        if not expected:
-            st.error("No password is configured.")
-            st.markdown(
-                "Create `.streamlit/secrets.toml` next to `app.py` and add:"
-            )
-            st.code('APP_PASSWORD = "choose-a-strong-password"', language="toml")
-            return
-
-        st.subheader("🔐 Secure Login")
-        locked = st.session_state.attempts >= MAX_LOGIN_ATTEMPTS
-
-        with st.form("login_form"):
-            password = st.text_input("Password", type="password", placeholder="Enter password")
-            submitted = st.form_submit_button("🚀 Open School AI", use_container_width=True)
-
-        if submitted:
-            if locked:
-                st.error("Too many failed attempts. Refresh the page to try again.")
-            elif hmac.compare_digest(password.encode(), expected.encode()):
-                st.session_state.authenticated = True
-                st.session_state.attempts = 0
-                st.rerun()
-            else:
-                st.session_state.attempts += 1
-                left = MAX_LOGIN_ATTEMPTS - st.session_state.attempts
-                st.error(f"Incorrect password. Attempts left: {max(left, 0)}")
-
-        st.caption(f"© {APP_NAME}")
-
-
-# ==================================================
-# 9. PAGES
-# ==================================================
-
-
-def home_page() -> None:
-    st.markdown('<div class="main-title">Welcome to School AI 🎓</div>', unsafe_allow_html=True)
-    st.markdown('<div class="subtitle">Learn Smarter • Study Better • Achieve More</div>', unsafe_allow_html=True)
-    st.write("")
-
-    notes = load_items(NOTES_FILE)
-    tasks = load_items(PLANNER_FILE)
-    pending = sum(1 for t in tasks if not t.get("completed"))
-
-    a, b, c, d = st.columns(4)
-    a.metric("Subjects", len(SUBJECTS))
-    b.metric("Knowledge Topics", len(KNOWLEDGE))
-    c.metric("Saved Notes", len(notes))
-    d.metric("Pending Tasks", pending)
-
-    st.divider()
-    st.subheader("🚀 Learning Tools")
-
-    cards = [
-        ("🤖 AI Chatbot", "Ask educational questions."),
-        ("🧮 Calculator", "Solve basic maths problems."),
-        ("📝 Notes", "Write and save study notes."),
-        ("🧠 Quiz", "Test your knowledge."),
-        ("📅 Study Planner", "Organize your study tasks."),
-        ("📚 Knowledge Base", "Explore prepared questions."),
-    ]
-    columns = st.columns(3)
-    for i, (title, description) in enumerate(cards):
-        with columns[i % 3]:
-            st.markdown(
-                f'<div class="panel"><h3>{title}</h3><p>{description}</p></div>',
-                unsafe_allow_html=True,
-            )
-
-    if ai_available():
-        st.success("AI tutor is connected. Unknown questions are answered by AI.")
-    else:
-        st.info("Running in offline mode: answers come from the built-in knowledge base.")
-
-
-def render_message(msg: dict) -> None:
-    with st.chat_message(msg["role"]):
-        if msg.get("rtl"):
-            safe = html.escape(msg["content"]).replace("\n", "<br>")
-            st.markdown(f'<div class="rtl">{safe}</div>', unsafe_allow_html=True)
-        else:
-            st.markdown(msg["content"])
-        if msg.get("source") and msg["source"] != "System":
-            st.caption(f"Source: {msg['source']}")
-
-
-def chatbot_page() -> None:
-    st.title("🤖 School AI Chatbot")
-    s = st.session_state
-    st.caption(f"{s.student_class}  •  {s.subject}  •  {s.language}  (change in the sidebar)")
-
-    for message in s.messages:
-        render_message(message)
-
-    question = st.chat_input("Ask your educational question...")
-    if question:
-        history = list(s.messages)
-        s.messages.append({"role": "user", "content": question})
-        with st.spinner("Thinking..."):
-            answer, source = chatbot(question, s.subject, s.language, s.student_class, history)
-        s.messages.append(
-            {"role": "assistant", "content": answer, "source": source, "rtl": s.language == "Urdu"}
-        )
-        st.rerun()
-
-    if s.messages and st.button("🗑️ Clear Conversation"):
-        s.messages = []
-        st.rerun()
-
-
-def calculator_page() -> None:
-    st.title("🧮 Smart Calculator")
-
-    with st.form("calc_form"):
-        expression = st.text_input("Enter mathematical expression", placeholder="Example: (25 + 15) * 2")
-        submitted = st.form_submit_button("Calculate")
-
-    if submitted:
-        try:
-            st.success(f"Answer: {safe_calculate(expression)}")
-        except ZeroDivisionError:
-            st.error("You cannot divide by zero.")
-        except Exception:
-            st.error("Invalid calculation. Check your expression.")
-
-    st.markdown("### Examples")
-    for example in ("25 + 15", "100 / 5", "(10 + 5) * 3", "2 ** 4", "17 % 5"):
-        st.code(example)
-    st.caption("Supported: + - * / ** (or ^) % and brackets.")
-
-
-def notes_page() -> None:
-    st.title("📝 Study Notes Manager")
-    notes = load_items(NOTES_FILE)
-
-    with st.form("note_form", clear_on_submit=True):
-        title = st.text_input("Note Title")
-        subject = st.selectbox("Note Subject", SUBJECTS)
-        content = st.text_area("Write Your Notes", height=180)
-        submitted = st.form_submit_button("💾 Save Note")
-
-    if submitted:
-        if title.strip() and content.strip():
-            notes.append(
-                {
-                    "id": uuid.uuid4().hex,
-                    "title": title.strip(),
-                    "subject": subject,
-                    "content": content.strip(),
-                    "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                }
-            )
-            save_json(NOTES_FILE, notes)
-            st.success("Your note has been saved.")
-            st.rerun()
-        else:
-            st.warning("Please enter a title and note.")
-
-    st.divider()
-    st.subheader("Saved Notes")
-
-    col1, col2 = st.columns([2, 1])
-    search = col1.text_input("Search notes", placeholder="Type a keyword...")
-    subject_filter = col2.selectbox("Filter by subject", ["All"] + SUBJECTS)
-
-    visible = [
-        n
-        for n in notes
-        if (subject_filter == "All" or n["subject"] == subject_filter)
-        and (not search or search.lower() in (n["title"] + " " + n["content"]).lower())
-    ]
-
-    if not visible:
-        st.info("No notes found.")
-
-    for note in reversed(visible):
-        with st.expander(note["title"]):
-            st.caption(f"{note['subject']} • {note['date']}")
-            st.write(note["content"])
-            if st.button("Delete Note", key=f"del_note_{note['id']}"):
-                save_json(NOTES_FILE, [n for n in notes if n["id"] != note["id"]])
-                st.rerun()
-
-    if notes:
-        st.download_button(
-            "⬇️ Export all notes (JSON)",
-            data=json.dumps(notes, ensure_ascii=False, indent=2),
-            file_name="school_ai_notes.json",
-            mime="application/json",
-        )
-
-
-QUIZ = [
-    {"question": "What is the chemical formula of water?", "options": ["CO2", "H2O", "O2", "NaCl"], "answer": "H2O", "explanation": "Water contains two hydrogen atoms and one oxygen atom."},
-    {"question": "What is the capital of Pakistan?", "options": ["Lahore", "Karachi", "Islamabad", "Quetta"], "answer": "Islamabad", "explanation": "Islamabad is the capital city of Pakistan."},
-    {"question": "What does CPU stand for?", "options": ["Central Processing Unit", "Computer Power Utility", "Central Program User", "Control Processing User"], "answer": "Central Processing Unit", "explanation": "CPU stands for Central Processing Unit."},
-    {"question": "What is 12 × 8?", "options": ["86", "96", "108", "88"], "answer": "96", "explanation": "12 multiplied by 8 equals 96."},
-    {"question": "Which organelle contains genetic material?", "options": ["Nucleus", "Ribosome", "Cell wall", "Vacuole"], "answer": "Nucleus", "explanation": "The nucleus contains most of the cell's genetic material."},
-    {"question": "Which force pulls objects toward Earth?", "options": ["Friction", "Gravity", "Magnetism", "Tension"], "answer": "Gravity", "explanation": "Gravity attracts objects toward Earth's centre."},
-    {"question": "Who is known as the founder of Pakistan?", "options": ["Allama Iqbal", "Liaquat Ali Khan", "Muhammad Ali Jinnah", "Sir Syed Ahmad Khan"], "answer": "Muhammad Ali Jinnah", "explanation": "Muhammad Ali Jinnah is widely known as the founder of Pakistan."},
-    {"question": "Which planet is known as the Red Planet?", "options": ["Venus", "Mars", "Jupiter", "Mercury"], "answer": "Mars", "explanation": "Mars looks red because of iron oxide on its surface."},
-    {"question": "Which gas do plants absorb for photosynthesis?", "options": ["Oxygen", "Nitrogen", "Carbon dioxide", "Hydrogen"], "answer": "Carbon dioxide", "explanation": "Plants use carbon dioxide, water and sunlight to make glucose."},
-    {"question": "Which of these words is a noun?", "options": ["Quickly", "Teacher", "Beautiful", "Run"], "answer": "Teacher", "explanation": "A noun names a person, place, thing or idea."},
-    {"question": "In which year did Pakistan become independent?", "options": ["1940", "1947", "1956", "1971"], "answer": "1947", "explanation": "Pakistan became independent on 14 August 1947."},
-]
-QUIZ_SIZE = 10
-
-
-def new_quiz() -> None:
-    st.session_state.quiz_questions = random.sample(QUIZ, min(QUIZ_SIZE, len(QUIZ)))
-    st.session_state.quiz_version += 1  # new widget keys = fresh, unselected radios
-
-
-def quiz_page() -> None:
-    st.title("🧠 Knowledge Quiz")
-
-    if "quiz_questions" not in st.session_state:
-        new_quiz()
-
-    questions = st.session_state.quiz_questions
-    version = st.session_state.quiz_version
-
-    with st.form(f"quiz_form_{version}"):
-        answers = []
-        for i, item in enumerate(questions):
-            st.markdown(f"**Q{i + 1}. {item['question']}**")
-            answers.append(
-                st.radio("Choose an answer:", item["options"], key=f"quiz_{version}_{i}", index=None)
-            )
-            st.divider()
-        submitted = st.form_submit_button("Submit Quiz")
-
-    if submitted:
-        score = 0
-        for i, item in enumerate(questions):
-            if answers[i] == item["answer"]:
-                score += 1
-                st.success(f"Q{i + 1}: Correct!")
-            else:
-                st.error(f"Q{i + 1}: Correct answer: {item['answer']}")
-            st.caption(item["explanation"])
-        st.metric("Your Score", f"{score} / {len(questions)}")
-
-    if st.button("🔄 New Quiz"):
-        new_quiz()
-        st.rerun()
-
-
-def planner_page() -> None:
-    st.title("📅 Study Planner")
-    tasks = load_items(PLANNER_FILE)
-
-    with st.form("task_form", clear_on_submit=True):
-        task_name = st.text_input("Study Task")
-        task_subject = st.selectbox("Task Subject", SUBJECTS)
-        task_date = st.date_input("Study Date", date.today())
-        submitted = st.form_submit_button("➕ Add Study Task")
-
-    if submitted:
-        if task_name.strip():
-            tasks.append(
-                {
-                    "id": uuid.uuid4().hex,
-                    "task": task_name.strip(),
-                    "subject": task_subject,
-                    "date": str(task_date),
-                    "completed": False,
-                }
-            )
-            save_json(PLANNER_FILE, tasks)
-            st.success("Study task added.")
-            st.rerun()
-        else:
-            st.warning("Enter a task name.")
-
-    st.divider()
-    done_count = sum(1 for t in tasks if t.get("completed"))
-    m1, m2 = st.columns(2)
-    m1.metric("Pending", len(tasks) - done_count)
-    m2.metric("Completed", done_count)
-
-    st.subheader("Your Study Tasks")
-    if not tasks:
-        st.info("No study tasks yet.")
-
-    today = date.today().isoformat()
-    for task in sorted(tasks, key=lambda t: (t.get("completed", False), t["date"])):
-        completed = task.get("completed", False)
-        overdue = (not completed) and task["date"] < today
-        label = f"**{task['task']}** — {task['subject']} — {task['date']}"
-        if overdue:
-            label += "  ⚠️ *overdue*"
-
-        c1, c2, c3 = st.columns([6, 1.5, 1.5])
-        if completed:
-            c1.markdown(f'<span class="done">✅ {label}</span>', unsafe_allow_html=True)
-        else:
-            c1.markdown(label)
-
-        if c2.button("Undo" if completed else "Complete", key=f"toggle_{task['id']}"):
-            task["completed"] = not completed
-            save_json(PLANNER_FILE, tasks)
-            st.rerun()
-        if c3.button("Delete", key=f"del_task_{task['id']}"):
-            save_json(PLANNER_FILE, [t for t in tasks if t["id"] != task["id"]])
-            st.rerun()
-
-
-def knowledge_page() -> None:
-    st.title("📚 School Knowledge Base")
-
-    col1, col2 = st.columns([2, 1])
-    search = col1.text_input("Search a question or topic").lower().strip()
-    subject_filter = col2.selectbox("Subject", ["All"] + SUBJECTS)
-
-    shown = 0
-    for question, (answer, subject) in KNOWLEDGE.items():
-        if subject_filter != "All" and subject != subject_filter:
-            continue
-        if search and search not in question and search not in answer.lower():
-            continue
-        shown += 1
-        with st.expander(question.title()):
-            st.write(answer)
-            st.caption(f"Subject: {subject}")
-
-    if shown == 0:
-        st.info("No matching topics found.")
-
-
-def about_page() -> None:
-    st.title("ℹ️ About This Project")
     st.markdown(
-        f"""
-## 🎓 {APP_NAME}
-
-A professional educational assistant for Class 1 to Class 10.
-
-**Features**
-- Password-protected entry (password kept in secrets, not in code)
-- Chatbot in English, Urdu and Roman Urdu
-- Optional Claude AI tutor for questions outside the knowledge base
-- Calculator, study notes, quiz and study planner
-- Searchable knowledge base
-
-**Version:** 2.0  
-**Developer:** Muhammad Abdullah
-"""
-    )
-    if ai_available():
-        st.success("AI tutor: connected")
-    else:
-        st.warning(
-            "AI tutor: not connected. The chatbot uses prepared offline answers only. "
-            "Add ANTHROPIC_API_KEY to your secrets to enable AI answers."
-        )
-    st.caption(
-        "Notes and planner are stored in the local 'data' folder. On hosts with "
-        "temporary storage (such as free cloud tiers) they may reset on restart."
+        "<h2 style='text-align:center;color:white;'>Choose Your Plan</h2>",
+        unsafe_allow_html=True
     )
 
+    st.markdown(
+        "<p style='text-align:center;color:#b9c7e8;'>"
+        "Select an access plan to continue learning."
+        "</p>",
+        unsafe_allow_html=True
+    )
 
-# ==================================================
-# 10. MAIN APPLICATION
-# ==================================================
+    col1, col2, col3 = st.columns(3, gap="medium")
 
-PAGES = {
-    "🏠 Home": home_page,
-    "🤖 AI Chatbot": chatbot_page,
-    "🧮 Calculator": calculator_page,
-    "📝 Study Notes": notes_page,
-    "🧠 Quiz": quiz_page,
-    "📅 Study Planner": planner_page,
-    "📚 Knowledge Base": knowledge_page,
-    "ℹ️ About": about_page,
-}
+    with col1:
+        st.markdown("""
+        <div class="plan-card">
+            <div class="plan-name">🎁 Free Trial</div>
+            <div class="plan-price">Rs. 0</div>
+            <div class="plan-description">
+                • 1 Day Access<br><br>
+                • Explore the chatbot<br><br>
+                • Try learning features
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        if st.button("Start Free Trial", key="trial"):
+            st.session_state.trial_started = time.time()
+            st.rerun()
+
+    with col2:
+        st.markdown("""
+        <div class="plan-card">
+            <div class="plan-name">📅 Weekly Plan</div>
+            <div class="plan-price">Rs. 200</div>
+            <div class="plan-description">
+                • 7 Days Access<br><br>
+                • School AI Assistant<br><br>
+                • Learning support
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        if st.button("Select Weekly Plan", key="weekly"):
+            st.session_state.selected_plan = "weekly"
+            st.info("Payment setup is required before activation.")
+
+    with col3:
+        st.markdown("""
+        <div class="plan-card featured">
+            <div class="tag">POPULAR PLAN</div>
+            <div class="plan-name">⭐ Monthly Plan</div>
+            <div class="plan-price">Rs. 500</div>
+            <div class="plan-description">
+                • 30 Days Access<br><br>
+                • School AI Assistant<br><br>
+                • Learning support
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        if st.button("Select Monthly Plan", key="monthly"):
+            st.session_state.selected_plan = "monthly"
+            st.info("Payment setup is required before activation.")
+
+    st.markdown("""
+    <div class="notice">
+        🔒 Secure access • Smart learning • Student-friendly experience
+        <br><br>
+        Payment activation will be available after a verified payment
+        gateway is connected.
+    </div>
+
+    <div class="footer">
+        © 2026 Muhammad Abdullah School AI
+        <br>
+        Designed for smarter learning.
+    </div>
+    """, unsafe_allow_html=True)
 
 
-def main_app() -> None:
-    st.sidebar.title("🎓 School AI")
-    st.sidebar.caption("Professional Learning Dashboard")
-    st.sidebar.success("Welcome, Muhammad Abdullah")
+# ---------------- ACCESS CONTROL ----------------
 
-    page = st.sidebar.radio("MAIN MENU", list(PAGES))
+if paid_active:
 
-    st.sidebar.divider()
-    st.sidebar.write("**Student Settings**")
-    st.sidebar.selectbox("Class", CLASSES, key="student_class")
-    st.sidebar.selectbox("Subject", SUBJECTS, key="subject")
-    st.sidebar.selectbox("Answer Language", LANGUAGES, key="language")
+    st.success("Your subscription is active!")
 
-    if ai_available():
-        st.sidebar.checkbox("Use AI for unknown questions", key="use_ai")
-    else:
-        st.sidebar.caption("AI tutor: offline mode")
+elif trial_active:
 
-    st.sidebar.divider()
-    if st.sidebar.button("🚪 Logout", use_container_width=True):
-        st.session_state.authenticated = False
-        st.session_state.messages = []
-        st.rerun()
+    remaining = int(
+        TRIAL_SECONDS - (now - st.session_state.trial_started)
+    )
 
-    PAGES[page]()
+    hours = remaining // 3600
+    minutes = (remaining % 3600) // 60
 
+    st.markdown("""
+    <div class="hero">
+        <h1>🎓 Muhammad Abdullah School AI</h1>
+        <p>Your free learning trial is active!</p>
+    </div>
+    """, unsafe_allow_html=True)
 
-if st.session_state.authenticated:
-    main_app()
+    st.success("🎉 Your 1-day free trial is active!")
+    st.info(f"⏳ Time remaining: {hours} hours and {minutes} minutes")
+
+    st.markdown("### Your AI School Assistant")
+    st.write("Paste your existing chatbot interface code below this section.")
+
 else:
-    login_screen()
+    show_subscription()
+    st.stop()
